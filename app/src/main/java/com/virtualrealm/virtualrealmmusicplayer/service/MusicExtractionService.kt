@@ -10,32 +10,21 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class MusicExtractionService @Inject constructor(
-    private val youtubeAudioHelper: YoutubeAudioHelper
-) {
+class MusicExtractionService @Inject constructor() {
+
     suspend fun extractAudioUrl(music: Music): String = withContext(Dispatchers.IO) {
         try {
             Log.d("MusicExtractionService", "Extracting audio URL for: ${music.id} - ${music.title}")
 
             when (music) {
                 is Music.SpotifyTrack -> {
-                    // Kode untuk Spotify tetap sama
+                    // Untuk Spotify, kita masih menggunakan URL dummy
                     "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
                 }
                 is Music.YoutubeVideo -> {
-                    // Gunakan YoutubeAudioHelper untuk mendapatkan URL audio
+                    // Return URL untuk digunakan oleh WebView, bukan MediaPlayer
                     val videoId = music.id
-                    val audioUrl = youtubeAudioHelper.getAudioUrlFromYoutube(videoId)
-
-                    if (!audioUrl.isNullOrEmpty()) {
-                        Log.d("MusicExtractionService", "Got YouTube audio URL: $audioUrl")
-                        audioUrl
-                    } else {
-                        // Fallback ke URL langsung
-                        val fallbackUrl = "https://invidious.sethforprivacy.com/latest_version?id=$videoId&itag=140&local=true"
-                        Log.d("MusicExtractionService", "Using fallback YouTube URL: $fallbackUrl")
-                        fallbackUrl
-                    }
+                    "youtube://$videoId"
                 }
             }
         } catch (e: Exception) {

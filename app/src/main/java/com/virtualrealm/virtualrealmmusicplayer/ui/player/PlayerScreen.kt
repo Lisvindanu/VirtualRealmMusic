@@ -27,12 +27,16 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -56,6 +60,9 @@ import com.virtualrealm.virtualrealmmusicplayer.ui.theme.YouTubeRed
 import com.virtualrealm.virtualrealmmusicplayer.util.Constants
 import com.virtualrealm.virtualrealmmusicplayer.util.DateTimeUtils
 import android.util.Log
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,6 +81,33 @@ fun PlayerScreen(
 
     val isPlaying by musicViewModel.isPlaying.collectAsState()
     val currentTrack by musicViewModel.currentTrack.collectAsState()
+
+    // Track position state
+    var sliderPosition by remember { mutableStateOf(0f) }
+    var trackDuration by remember { mutableStateOf(0L) }
+    var isUserSeeking by remember { mutableStateOf(false) }
+
+
+// Collect current position and duration
+    LaunchedEffect(isPlaying, currentTrack) {
+        while(true) {
+            if (currentTrack != null) {
+                val position = musicViewModel.getCurrentPosition()
+                val duration = musicViewModel.getDuration()
+
+                Log.d("PlayerScreen", "Position: $position ms, Duration: $duration ms")
+
+                if (duration > 0) {
+                    trackDuration = duration
+                    if (!isUserSeeking) {
+                        // Normalize between 0 and 1, protect against division by 0
+                        sliderPosition = (position.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+                    }
+                }
+            }
+            delay(1000) // Update every second
+        }
+    }
 
     // Load the music when the screen is first composed
     LaunchedEffect(musicId, musicType) {
@@ -146,6 +180,20 @@ fun PlayerScreen(
                         onSkipPrevious = {
                             musicViewModel.skipToPrevious()
                         },
+                        onSeekTo = { position ->
+                            isUserSeeking = true
+                            sliderPosition = position
+                            val seekToMs = (position * trackDuration).toLong()
+                            musicViewModel.seekTo(seekToMs)
+
+                            // Release seeking state after a short delay
+                            musicViewModel.viewModelScope.launch {
+                                delay(1000)
+                                isUserSeeking = false
+                            }
+                        },
+                        currentPosition = sliderPosition,
+                        duration = trackDuration,
                         musicType = musicType
                     )
                 }
@@ -163,6 +211,9 @@ fun PlayerContent(
     onTogglePlayPause: () -> Unit,
     onSkipNext: () -> Unit,
     onSkipPrevious: () -> Unit,
+    onSeekTo: (Float) -> Unit,
+    currentPosition: Float,
+    duration: Long,
     musicType: String
 ) {
     Column(
@@ -174,7 +225,7 @@ fun PlayerContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.6f)
+                .weight(0.5f) // Slightly reduce to make room for the slider
                 .padding(bottom = 16.dp)
         ) {
             if (musicType == Constants.MUSIC_TYPE_YOUTUBE) {
@@ -287,7 +338,7 @@ fun PlayerContent(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.4f),
+                .weight(0.5f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Song title
@@ -357,7 +408,40 @@ fun PlayerContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Playback progress slider
+            Column(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Slider(
+                    value = currentPosition,
+                    onValueChange = { onSeekTo(it) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Timestamp display
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Current position
+                    Text(
+                        text = DateTimeUtils.formatDuration((currentPosition * duration).toLong()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+
+                    // Total duration
+                    Text(
+                        text = DateTimeUtils.formatDuration(duration),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Playback controls
             Row(

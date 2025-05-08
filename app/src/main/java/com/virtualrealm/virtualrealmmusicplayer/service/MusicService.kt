@@ -29,6 +29,9 @@ import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -47,6 +50,9 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     @Inject
     lateinit var musicExtractionService: MusicExtractionService
 
+    @Inject
+    lateinit var youTubeAudioPlayer: YouTubeAudioPlayer
+
     private val binder = MusicBinder()
     private var mediaPlayer: MediaPlayer? = null
     private var currentMusic: Music? = null
@@ -54,6 +60,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var currentAlbumArt: Bitmap? = null
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val _playbackState = MutableStateFlow(PlaybackState.IDLE)
     val playbackState: StateFlow<PlaybackState> = _playbackState
@@ -87,6 +94,9 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         initMediaPlayer()
         initMediaSession()
         audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+        // Initialize YouTubeAudioPlayer
+        youTubeAudioPlayer.initialize()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             createNotificationChannel()
@@ -227,12 +237,6 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
-    // Di bagian onPrepared pada MusicService.kt
-
-
-    // Tambahkan di fun playMusic()
-    // Perbaikan untuk method playMusic di MusicService.kt
-
     fun playMusic(music: Music) {
         lifecycleScope.launch {
             try {
@@ -241,45 +245,61 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                 currentMusic = music
                 _currentTrack.value = music
 
-                // Reset media player
-                withContext(Dispatchers.Main) {
-                    try {
-                        mediaPlayer?.reset()
-                        Log.d("MusicService", "MediaPlayer reset successful")
-                    } catch (e: Exception) {
-                        Log.e("MusicService", "Error resetting MediaPlayer: ${e.message}", e)
-                    }
-                }
-
-                // Dapatkan URL audio
-                Log.d("MusicService", "Extracting audio URL for: ${music.id}")
-                val audioUrl = try {
-                    musicExtractionService.extractAudioUrl(music)
-                } catch (e: Exception) {
-                    Log.e("MusicService", "Error extracting audio URL: ${e.message}", e)
-                    // Fallback URL jika gagal
-                    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-                }
-
+                // Extract URL audio
+                val audioUrl = musicExtractionService.extractAudioUrl(music)
                 Log.d("MusicService", "Using audio URL: $audioUrl")
 
-                // Set data source dan prepare MediaPlayer
-                withContext(Dispatchers.IO) {
-                    try {
-                        // Cara 1: Gunakan setDataSource sederhana
-                        mediaPlayer?.setDataSource(audioUrl)
+                // Cek apakah ini URL YouTube
+                if (audioUrl.startsWith("youtube://")) {
+                    // Gunakan YouTubeAudioPlayer
+                    val videoId = audioUrl.substringAfter("youtube://")
 
-                        // Cara 2: Jika perlu User-Agent, gunakan ini
-                        // val headers = HashMap<String, String>()
-                        // headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
-                        // mediaPlayer?.setDataSource(applicationContext, Uri.parse(audioUrl), headers)
+                    // Set callbacks
+                    youTubeAudioPlayer.onPrepared = {
+                        _playbackState.value = PlaybackState.PLAYING
+                        updatePlaybackState(PlaybackState.PLAYING)
 
-                        Log.d("MusicService", "Set data source success")
-                        mediaPlayer?.prepareAsync()
-                        Log.d("MusicService", "Preparing media player asynchronously")
-                    } catch (e: Exception) {
-                        Log.e("MusicService", "Error preparing media player: ${e.message}", e)
+                        // Jalankan di foreground dengan notifikasi
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                            startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                        } else {
+                            startForeground(NOTIFICATION_ID, createNotification())
+                        }
+                    }
+
+                    youTubeAudioPlayer.onCompletion = {
+                        skipToNext()
+                    }
+
+                    youTubeAudioPlayer.onError = { message ->
+                        Log.e("MusicService", "YouTube player error: $message")
                         _playbackState.value = PlaybackState.ERROR
+                    }
+
+                    // Load dan putar YouTube
+                    youTubeAudioPlayer.loadAndPlayYouTube(videoId)
+
+                } else {
+                    // Gunakan MediaPlayer biasa untuk non-YouTube
+                    withContext(Dispatchers.Main) {
+                        try {
+                            mediaPlayer?.reset()
+                            Log.d("MusicService", "MediaPlayer reset successful")
+                        } catch (e: Exception) {
+                            Log.e("MusicService", "Error resetting MediaPlayer: ${e.message}", e)
+                        }
+                    }
+
+                    withContext(Dispatchers.IO) {
+                        try {
+                            mediaPlayer?.setDataSource(audioUrl)
+                            Log.d("MusicService", "Set data source success")
+                            mediaPlayer?.prepareAsync()
+                            Log.d("MusicService", "Preparing media player asynchronously")
+                        } catch (e: Exception) {
+                            Log.e("MusicService", "Error preparing media player: ${e.message}", e)
+                            _playbackState.value = PlaybackState.ERROR
+                        }
                     }
                 }
 
@@ -338,7 +358,14 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
             else -> PlaybackStateCompat.STATE_NONE
         }
 
-        playbackStateBuilder.setState(playbackState, mediaPlayer?.currentPosition?.toLong() ?: 0, 1.0f)
+        val currentPosition = if (currentMusic is Music.YoutubeVideo &&
+            _playbackState.value == PlaybackState.PLAYING) {
+            youTubeAudioPlayer.currentPosition.value
+        } else {
+            mediaPlayer?.currentPosition?.toLong() ?: 0
+        }
+
+        playbackStateBuilder.setState(playbackState, currentPosition, 1.0f)
         playbackStateBuilder.setActions(actions)
 
         mediaSession?.setPlaybackState(playbackStateBuilder.build())
@@ -381,7 +408,19 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     }
 
     fun play() {
-        if (_playbackState.value == PlaybackState.PAUSED) {
+        if (currentMusic is Music.YoutubeVideo &&
+            _currentTrack.value?.id?.startsWith("youtube://") == true) {
+            youTubeAudioPlayer.play()
+            _playbackState.value = PlaybackState.PLAYING
+            updatePlaybackState(PlaybackState.PLAYING)
+
+            // Use the appropriate overload based on API level
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } else if (_playbackState.value == PlaybackState.PAUSED) {
             mediaPlayer?.start()
             _playbackState.value = PlaybackState.PLAYING
             updatePlaybackState(PlaybackState.PLAYING)
@@ -396,7 +435,13 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     }
 
     fun pause() {
-        if (_playbackState.value == PlaybackState.PLAYING) {
+        if (currentMusic is Music.YoutubeVideo &&
+            _currentTrack.value?.id?.startsWith("youtube://") == true) {
+            youTubeAudioPlayer.pause()
+            _playbackState.value = PlaybackState.PAUSED
+            updatePlaybackState(PlaybackState.PAUSED)
+            updateNotification()
+        } else if (_playbackState.value == PlaybackState.PLAYING) {
             mediaPlayer?.pause()
             _playbackState.value = PlaybackState.PAUSED
             updatePlaybackState(PlaybackState.PAUSED)
@@ -405,7 +450,13 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     }
 
     fun stop() {
-        mediaPlayer?.stop()
+        if (currentMusic is Music.YoutubeVideo &&
+            _currentTrack.value?.id?.startsWith("youtube://") == true) {
+            youTubeAudioPlayer.stop()
+        } else {
+            mediaPlayer?.stop()
+        }
+
         _playbackState.value = PlaybackState.STOPPED
         updatePlaybackState(PlaybackState.STOPPED)
 
@@ -514,8 +565,6 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         return START_NOT_STICKY
     }
 
-// Tambahkan fungsi logPlaybackState di kelas MusicService
-
     /**
      * Log informasi status pemutaran untuk membantu debugging
      */
@@ -529,8 +578,20 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
             PlaybackState.ERROR -> "ERROR"
         }
 
-        val positionMs = mediaPlayer?.currentPosition ?: -1
-        val durationMs = mediaPlayer?.duration ?: -1
+        val positionMs = if (currentMusic is Music.YoutubeVideo &&
+            _playbackState.value == PlaybackState.PLAYING) {
+            youTubeAudioPlayer.currentPosition.value
+        } else {
+            mediaPlayer?.currentPosition ?: -1
+        }
+
+        val durationMs = if (currentMusic is Music.YoutubeVideo &&
+            _playbackState.value == PlaybackState.PLAYING) {
+            youTubeAudioPlayer.duration.value
+        } else {
+            mediaPlayer?.duration ?: -1
+        }
+
         val musicInfo = currentMusic?.let { "${it.title} (${it.id})" } ?: "No music"
 
         Log.d("MusicService", "Playback state: $stateStr | Music: $musicInfo | Position: ${positionMs}ms/${durationMs}ms | $additionalInfo")
@@ -561,11 +622,43 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     override fun onError(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
         Log.e("MusicService", "Media player error: what=$what, extra=$extra")
-        _playbackState.value = PlaybackState.ERROR
-        updatePlaybackState(PlaybackState.STOPPED)
+
+        // If this is a YouTube video, fallback to the WebView player
+        currentMusic?.let { music ->
+            if (music is Music.YoutubeVideo) {
+                serviceScope.launch {
+                    try {
+                        Log.d("MusicService", "Retrying with YouTube WebView player")
+                        youTubeAudioPlayer.loadAndPlayYouTube(music.id)
+                        return@launch
+                    } catch (e: Exception) {
+                        Log.e("MusicService", "Error in YouTube fallback: ${e.message}", e)
+                        _playbackState.value = PlaybackState.ERROR
+                        updatePlaybackState(PlaybackState.STOPPED)
+                    }
+                }
+                return true
+            }
+        }
+
+        // For non-YouTube media, try with a backup URL
+        serviceScope.launch {
+            try {
+                val fallbackUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+
+                Log.d("MusicService", "Retrying with fallback URL: $fallbackUrl")
+                mediaPlayer?.reset()
+                mediaPlayer?.setDataSource(fallbackUrl)
+                mediaPlayer?.prepareAsync()
+            } catch (e: Exception) {
+                Log.e("MusicService", "Error in fallback: ${e.message}", e)
+                _playbackState.value = PlaybackState.ERROR
+                updatePlaybackState(PlaybackState.STOPPED)
+            }
+        }
+
         return true
     }
-
 
     override fun onCompletion(mp: MediaPlayer?) {
         // When current track completes, play next track
@@ -590,6 +683,8 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
+        youTubeAudioPlayer.release()
         mediaPlayer?.release()
         mediaPlayer = null
         mediaSession?.release()
@@ -604,4 +699,96 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         const val ACTION_NEXT = "com.virtualrealm.virtualrealmmusicplayer.action.NEXT"
         const val ACTION_PREVIOUS = "com.virtualrealm.virtualrealmmusicplayer.action.PREVIOUS"
     }
-}
+
+
+
+    // Mendapatkan posisi pemutaran saat ini (dalam ms)
+    fun getCurrentPosition(): Long {
+        return when {
+            // Jika YouTube player aktif
+            (currentMusic is Music.YoutubeVideo &&
+                    youTubeAudioPlayer.isPlaying.value) -> {
+                val position = youTubeAudioPlayer.currentPosition.value
+                Log.d("MusicService", "YouTube current position: $position ms")
+                position
+            }
+            // Jika MediaPlayer aktif dan playing/paused
+            (mediaPlayer != null &&
+                    (_playbackState.value == PlaybackState.PLAYING ||
+                            _playbackState.value == PlaybackState.PAUSED)) -> {
+                val position = mediaPlayer?.currentPosition?.toLong() ?: 0
+                Log.d("MusicService", "MediaPlayer current position: $position ms")
+                position
+            }
+            // Default jika tidak ada player aktif
+            else -> {
+                Log.d("MusicService", "No active player, returning position 0")
+                0L
+            }
+        }
+    }
+
+    // Mendapatkan durasi total (dalam ms)
+    fun getDuration(): Long {
+        return when {
+            // Jika YouTube player aktif
+            (currentMusic is Music.YoutubeVideo) -> {
+                val duration = youTubeAudioPlayer.duration.value
+                Log.d("MusicService", "YouTube duration: $duration ms")
+                if (duration <= 0) {
+                    // Jika durasi belum tersedia dari YouTube, gunakan perkiraan
+                    estimateDurationFromTrack()
+                } else {
+                    duration
+                }
+            }
+            // Jika MediaPlayer aktif
+            (mediaPlayer != null && mediaPlayer?.duration ?: -1 > 0) -> {
+                val duration = mediaPlayer?.duration?.toLong() ?: 0
+                Log.d("MusicService", "MediaPlayer duration: $duration ms")
+                duration
+            }
+            // Default jika tidak ada player aktif
+            else -> {
+                val estimatedDuration = estimateDurationFromTrack()
+                Log.d("MusicService", "Using estimated duration: $estimatedDuration ms")
+                estimatedDuration
+            }
+        }
+    }
+
+    // Helper function untuk memperkirakan durasi dari metadata track
+    private fun estimateDurationFromTrack(): Long {
+        return when (val music = currentMusic) {
+            is Music.SpotifyTrack -> {
+                music.durationMs
+            }
+            is Music.YoutubeVideo -> {
+                // Perkiraan untuk video YouTube (gunakan 4 menit sebagai default)
+                4 * 60 * 1000L
+            }
+            else -> 3 * 60 * 1000L // Default 3 menit
+        }
+    }
+
+
+    // Mengubah posisi pemutaran (dalam ms)
+    fun seekTo(position: Long) {
+        Log.d("MusicService", "Seeking to position: $position ms")
+
+        when {
+            // Jika YouTube player aktif
+            (currentMusic is Music.YoutubeVideo &&
+                    youTubeAudioPlayer.isPlaying.value) -> {
+                youTubeAudioPlayer.seekTo(position)
+            }
+            // Jika MediaPlayer aktif
+            (mediaPlayer != null) -> {
+                try {
+                    mediaPlayer?.seekTo(position.toInt())
+                } catch (e: Exception) {
+                    Log.e("MusicService", "Error seeking MediaPlayer: ${e.message}")
+                }
+            }
+        }
+    } }

@@ -1,4 +1,5 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/MusicViewModel.kt
+
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
 import android.annotation.SuppressLint
@@ -134,6 +135,21 @@ class MusicViewModel @Inject constructor(
         } else {
             play()
         }
+    }
+
+    // Fungsi baru untuk mendapatkan posisi pemutaran saat ini
+    fun getCurrentPosition(): Long {
+        return musicService?.getCurrentPosition() ?: 0
+    }
+
+    // Fungsi baru untuk mendapatkan durasi total
+    fun getDuration(): Long {
+        return musicService?.getDuration() ?: 0
+    }
+
+    // Fungsi baru untuk mengubah posisi pemutaran
+    fun seekTo(position: Long) {
+        musicService?.seekTo(position)
     }
 
     override fun onCleared() {
