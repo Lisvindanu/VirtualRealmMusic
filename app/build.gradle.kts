@@ -98,6 +98,7 @@ dependencies {
     implementation(libs.androidx.runtime.livedata)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
+    implementation(libs.androidx.lifecycle.service)
     debugImplementation(libs.ui.tooling)
 
     // Compose Navigation
@@ -139,6 +140,10 @@ dependencies {
 
     // DataStore Preferences
     implementation(libs.androidx.datastore.preferences)
+
+    // Add to dependencies section in app/build.gradle.kts
+    implementation(libs.glide)
+    implementation(libs.androidx.media)  // For MediaStyle notifications
 
     // Testing
     testImplementation(libs.junit)

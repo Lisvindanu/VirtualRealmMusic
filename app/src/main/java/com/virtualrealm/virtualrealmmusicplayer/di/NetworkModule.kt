@@ -17,6 +17,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 import javax.inject.Named
+import javax.inject.Provider
 import javax.inject.Singleton
 
 @Module
@@ -40,10 +41,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAuthAuthenticator(
-        spotifyApi: SpotifyApi,
+        spotifyApiProvider: Provider<SpotifyApi>, // Use Provider instead of direct injection
         authPreferences: AuthPreferences
     ): AuthAuthenticator {
-        return AuthAuthenticator(spotifyApi, authPreferences)
+        return AuthAuthenticator(spotifyApiProvider, authPreferences)
     }
 
     @Provides

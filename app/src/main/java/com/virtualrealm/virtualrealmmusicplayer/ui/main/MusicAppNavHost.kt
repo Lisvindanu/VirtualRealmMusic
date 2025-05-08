@@ -26,6 +26,7 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
 import com.virtualrealm.virtualrealmmusicplayer.ui.auth.LoginScreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.home.HomeScreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.player.PlayerScreen
+import com.virtualrealm.virtualrealmmusicplayer.ui.playlist.PlaylistScreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.search.SearchScreen
 
 @Composable
@@ -145,6 +146,22 @@ fun MusicAppNavHost(
                     musicType = musicType,
                     onNavigateBack = {
                         navController.popBackStack()
+                    },
+                    onNavigateToPlaylist = {
+                        navController.navigate(Screen.Playlist.route)
+                    }
+                )
+            }
+
+            composable(Screen.Playlist.route) {
+                PlaylistScreen(
+                    onNavigateBack = {
+                        navController.popBackStack()
+                    },
+                    onNavigateToPlayer = { musicId, musicType ->
+                        navController.navigate(
+                            Screen.Player.createRoute(musicId, musicType)
+                        )
                     }
                 )
             }

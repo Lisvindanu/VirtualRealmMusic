@@ -11,11 +11,12 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.Route
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 @Singleton
 class AuthAuthenticator @Inject constructor(
-    private val spotifyApi: SpotifyApi,
+    private val spotifyApiProvider: Provider<SpotifyApi>, // Change to Provider
     private val authPreferences: AuthPreferences
 ) : Authenticator {
 
@@ -38,6 +39,9 @@ class AuthAuthenticator @Inject constructor(
             }
 
             try {
+                // Get the SpotifyApi from the provider when needed
+                val spotifyApi = spotifyApiProvider.get()
+
                 val tokenResponse = spotifyApi.refreshToken(
                     refreshToken = authState.refreshToken,
                     clientId = ApiCredentials.SPOTIFY_CLIENT_ID,

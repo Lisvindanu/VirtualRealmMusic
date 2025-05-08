@@ -9,7 +9,6 @@ import javax.inject.Inject
 class GetAuthStateUseCase @Inject constructor(
     private val authRepository: AuthRepository
 ) {
-    // Hapus keyword suspend
     suspend operator fun invoke(): Flow<AuthState> {
         return authRepository.getAuthState()
     }

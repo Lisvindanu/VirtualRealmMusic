@@ -41,4 +41,10 @@
     <string name="network_error">Network error. Please check your internet connection.</string>
     <string name="spotify_auth_error">Authentication with Spotify failed</string>
     <string name="search_error">Failed to search for music</string>
+
+    <!-- Media Player -->
+    <string name="playback_channel_name">Music Playback</string>
+    <string name="playback_channel_description">Controls for music playback</string>
+    <string name="no_track_playing">No track playing</string>
+    <string name="view_playlist">View Playlist</string>
 </resources>

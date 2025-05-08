@@ -18,28 +18,28 @@ import javax.inject.Inject
 class SearchViewModel @Inject constructor(
     private val searchMusicUseCase: SearchMusicUseCase,
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    getAuthStateUseCase: GetAuthStateUseCase
+    private val getAuthStateUseCase: GetAuthStateUseCase
 ) : ViewModel() {
 
     private val _searchResults = MutableStateFlow<Resource<List<Music>>>(Resource.Success(emptyList()))
     val searchResults: StateFlow<Resource<List<Music>>> = _searchResults.asStateFlow()
 
-    // Buat metode non-suspend untuk mendapatkan Flow dari use case
-    private fun getAuthStateFlow() = getAuthStateUseCase()
-
-    // Gunakan extension function untuk mengubah Flow menjadi StateFlow
-    val authState: StateFlow<AuthState?> = getAuthStateFlow()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    private val _authState = MutableStateFlow<AuthState?>(null)
+    val authState: StateFlow<AuthState?> = _authState.asStateFlow()
 
     private val _selectedSource = MutableStateFlow(SearchMusicUseCase.MusicSource.YOUTUBE)
     val selectedSource: StateFlow<SearchMusicUseCase.MusicSource> = _selectedSource.asStateFlow()
 
     private val _currentQuery = MutableStateFlow("")
     val currentQuery: StateFlow<String> = _currentQuery.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            getAuthStateUseCase().collect {
+                _authState.value = it
+            }
+        }
+    }
 
     fun setMusicSource(source: SearchMusicUseCase.MusicSource) {
         _selectedSource.value = source

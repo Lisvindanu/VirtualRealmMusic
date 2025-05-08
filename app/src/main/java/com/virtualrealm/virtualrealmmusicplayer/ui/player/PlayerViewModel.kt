@@ -33,6 +33,7 @@ class PlayerViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
+    // Update the loadMusic function in PlayerViewModel.kt
     fun loadMusic(musicId: String, musicType: String) {
         viewModelScope.launch {
             _isLoading.value = true
@@ -41,34 +42,32 @@ class PlayerViewModel @Inject constructor(
             try {
                 when (musicType) {
                     Constants.MUSIC_TYPE_SPOTIFY -> {
-                        // Get the Spotify track from the database
-                        // For a real app, you might want to fetch it from the Spotify API if not in DB
-                        val musicFromDb = musicRepository.getFavorites().collect { favorites ->
-                            val track = favorites.find {
-                                it.id == musicId && it is Music.SpotifyTrack
-                            }
-
-                            if (track != null) {
-                                _music.value = track
-                                checkFavoriteStatus(musicId)
-                            }
-                        }
+                        // Create a simple Spotify track
+                        val track = Music.SpotifyTrack(
+                            id = musicId,
+                            title = "Spotify Track",
+                            artists = "Artist",
+                            thumbnailUrl = "",
+                            albumName = "Album",
+                            uri = "spotify:track:$musicId",
+                            durationMs = 0
+                        )
+                        _music.value = track
                     }
                     Constants.MUSIC_TYPE_YOUTUBE -> {
-                        // Get the YouTube video from the database
-                        // For a real app, you might want to fetch it from the YouTube API if not in DB
-                        val musicFromDb = musicRepository.getFavorites().collect { favorites ->
-                            val video = favorites.find {
-                                it.id == musicId && it is Music.YoutubeVideo
-                            }
-
-                            if (video != null) {
-                                _music.value = video
-                                checkFavoriteStatus(musicId)
-                            }
-                        }
+                        // Create a simple YouTube video
+                        val video = Music.YoutubeVideo(
+                            id = musicId,
+                            title = "YouTube Video",
+                            artists = "Channel",
+                            thumbnailUrl = "",
+                            channelTitle = "Channel"
+                        )
+                        _music.value = video
                     }
                 }
+                // Check favorite status
+                _isFavorite.value = musicRepository.isInFavorites(musicId)
             } catch (e: Exception) {
                 _error.value = "Error loading music: ${e.message}"
             } finally {

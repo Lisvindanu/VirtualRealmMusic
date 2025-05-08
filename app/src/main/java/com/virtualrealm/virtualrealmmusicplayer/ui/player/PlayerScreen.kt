@@ -1,4 +1,4 @@
-// Update PlayerScreen.kt to fix YouTube player references
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlayerScreen.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
 import android.view.ViewGroup
@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -29,17 +30,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -49,8 +47,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import com.google.accompanist.web.WebView
-import com.google.accompanist.web.rememberWebViewState
 import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.ErrorState
@@ -66,16 +62,28 @@ fun PlayerScreen(
     musicId: String,
     musicType: String,
     onNavigateBack: () -> Unit,
-    viewModel: PlayerViewModel = hiltViewModel()
+    onNavigateToPlaylist: () -> Unit,
+    playerViewModel: PlayerViewModel = hiltViewModel(),
+    musicViewModel: MusicViewModel = hiltViewModel()
 ) {
-    val music by viewModel.music.collectAsState()
-    val isFavorite by viewModel.isFavorite.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
-    val error by viewModel.error.collectAsState()
+    val music by playerViewModel.music.collectAsState()
+    val isFavorite by playerViewModel.isFavorite.collectAsState()
+    val isLoading by playerViewModel.isLoading.collectAsState()
+    val error by playerViewModel.error.collectAsState()
+
+    val isPlaying by musicViewModel.isPlaying.collectAsState()
+    val currentTrack by musicViewModel.currentTrack.collectAsState()
 
     // Load the music when the screen is first composed
     LaunchedEffect(musicId, musicType) {
-        viewModel.loadMusic(musicId, musicType)
+        playerViewModel.loadMusic(musicId, musicType)
+    }
+
+    // Start playback when music is loaded
+    LaunchedEffect(music) {
+        music?.let {
+            musicViewModel.playMusic(it)
+        }
     }
 
     Scaffold(
@@ -87,6 +95,14 @@ fun PlayerScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = stringResource(R.string.back)
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onNavigateToPlaylist) {
+                        Icon(
+                            imageVector = Icons.Default.PlaylistPlay,
+                            contentDescription = "View Playlist"
                         )
                     }
                 }
@@ -106,7 +122,7 @@ fun PlayerScreen(
                 ErrorState(
                     message = error ?: stringResource(R.string.unknown_error),
                     onRetry = {
-                        viewModel.loadMusic(musicId, musicType)
+                        playerViewModel.loadMusic(musicId, musicType)
                     }
                 )
             } else {
@@ -114,8 +130,18 @@ fun PlayerScreen(
                     PlayerContent(
                         music = music,
                         isFavorite = isFavorite,
+                        isPlaying = isPlaying,
                         onToggleFavorite = {
-                            viewModel.toggleFavorite()
+                            playerViewModel.toggleFavorite()
+                        },
+                        onTogglePlayPause = {
+                            musicViewModel.togglePlayPause()
+                        },
+                        onSkipNext = {
+                            musicViewModel.skipToNext()
+                        },
+                        onSkipPrevious = {
+                            musicViewModel.skipToPrevious()
                         },
                         musicType = musicType
                     )
@@ -129,7 +155,11 @@ fun PlayerScreen(
 fun PlayerContent(
     music: Music,
     isFavorite: Boolean,
+    isPlaying: Boolean,
     onToggleFavorite: () -> Unit,
+    onTogglePlayPause: () -> Unit,
+    onSkipNext: () -> Unit,
+    onSkipPrevious: () -> Unit,
     musicType: String
 ) {
     Column(
@@ -137,30 +167,12 @@ fun PlayerContent(
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Music player
+        // Album art section (60% of the screen height)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.5f)
-        ) {
-            when (musicType) {
-                Constants.MUSIC_TYPE_YOUTUBE -> {
-                    SimpleYouTubePlayer(videoId = music.id)
-                }
-                Constants.MUSIC_TYPE_SPOTIFY -> {
-                    SpotifyPlayer(trackId = music.id)
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Music details
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.5f),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .weight(0.6f)
+                .padding(bottom = 16.dp)
         ) {
             // Album art
             AsyncImage(
@@ -173,19 +185,26 @@ fun PlayerContent(
                 placeholder = painterResource(id = R.drawable.placeholder_album),
                 error = painterResource(id = R.drawable.placeholder_album),
                 modifier = Modifier
-                    .size(200.dp)
+                    .fillMaxSize()
                     .clip(RoundedCornerShape(8.dp))
             )
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
+        // Music info section (40% of the screen height)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.4f),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             // Song title
             Text(
                 text = music.title,
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -196,7 +215,9 @@ fun PlayerContent(
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -209,14 +230,17 @@ fun PlayerContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     SourceTag(
                         text = "Spotify",
-                        contentColor = SpotifyGreen
+                        contentColor = SpotifyGreen,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
                     )
                 }
                 is Music.YoutubeVideo -> {
@@ -225,14 +249,64 @@ fun PlayerContent(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
                     SourceTag(
                         text = "YouTube",
-                        contentColor = YouTubeRed
+                        contentColor = YouTubeRed,
+                        modifier = Modifier.align(Alignment.CenterHorizontally)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Playback controls
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onSkipPrevious,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_previous),
+                        contentDescription = "Previous",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                IconButton(
+                    onClick = onTogglePlayPause,
+                    modifier = Modifier.size(64.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(
+                            id = if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play
+                        ),
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        modifier = Modifier.size(48.dp),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+
+                IconButton(
+                    onClick = onSkipNext,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_next),
+                        contentDescription = "Next",
+                        modifier = Modifier.size(32.dp),
+                        tint = MaterialTheme.colorScheme.primary
                     )
                 }
             }
@@ -242,7 +316,9 @@ fun PlayerContent(
             // Favorite button
             IconButton(
                 onClick = onToggleFavorite,
-                modifier = Modifier.size(56.dp)
+                modifier = Modifier
+                    .size(48.dp)
+                    .align(Alignment.CenterHorizontally)
             ) {
                 Icon(
                     imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -258,20 +334,33 @@ fun PlayerContent(
     }
 }
 
-// Simple replacement for YouTubePlayerView
+// Simple replacement for YouTubePlayerView using AndroidView
 @Composable
 fun SimpleYouTubePlayer(videoId: String) {
-    val webViewState = rememberWebViewState(url = "https://www.youtube.com/embed/$videoId")
+    val youtubeEmbedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&rel=0&showinfo=0"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
     ) {
-        WebView(
-            state = webViewState,
-            onCreated = { webView ->
-                webView.settings.javaScriptEnabled = true
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.apply {
+                        javaScriptEnabled = true
+                        mediaPlaybackRequiresUserGesture = false
+                        domStorageEnabled = true
+                        loadWithOverviewMode = true
+                        useWideViewPort = true
+                    }
+                    webViewClient = WebViewClient()
+                    loadUrl(youtubeEmbedUrl)
+                }
             },
             modifier = Modifier.fillMaxSize()
         )
@@ -280,18 +369,29 @@ fun SimpleYouTubePlayer(videoId: String) {
 
 @Composable
 fun SpotifyPlayer(trackId: String) {
-    val spotifyEmbedUrl = "https://open.spotify.com/embed/track/$trackId"
-    val webViewState = rememberWebViewState(url = spotifyEmbedUrl)
+    val spotifyEmbedUrl = "https://open.spotify.com/embed/track/$trackId?utm_source=generator"
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
     ) {
-        WebView(
-            state = webViewState,
-            onCreated = { webView ->
-                webView.settings.javaScriptEnabled = true
+        AndroidView(
+            factory = { context ->
+                WebView(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                    settings.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        allowContentAccess = true
+                        allowFileAccess = true
+                    }
+                    webViewClient = WebViewClient()
+                    loadUrl(spotifyEmbedUrl)
+                }
             },
             modifier = Modifier.fillMaxSize()
         )

@@ -6,9 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.GetAuthStateUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
@@ -16,18 +17,14 @@ class MainViewModel @Inject constructor(
     private val getAuthStateUseCase: GetAuthStateUseCase
 ) : ViewModel() {
 
-    // Initialize StateFlow in the proper way
-    val authState: StateFlow<AuthState?>
+    private val _authState = MutableStateFlow<AuthState?>(null)
+    val authState: StateFlow<AuthState?> = _authState.asStateFlow()
 
     init {
-        // Initialize StateFlow in a coroutine-safe way
-        authState = viewModelScope.run {
-            getAuthStateUseCase()
-                .stateIn(
-                    scope = this,
-                    started = SharingStarted.WhileSubscribed(5000),
-                    initialValue = null
-                )
+        viewModelScope.launch {
+            getAuthStateUseCase().collect {
+                _authState.value = it
+            }
         }
     }
 }

@@ -11,10 +11,8 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.GetFavorite
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -26,30 +24,26 @@ class HomeViewModel @Inject constructor(
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    // Initialize StateFlows in init block
-    // Initialize StateFlow in a coroutine-safe way
-    val favorites: StateFlow<List<Music>> = viewModelScope.run {
-        getFavoritesUseCase()
-            .stateIn(
-                scope = this,
-                started = SharingStarted.WhileSubscribed(5000),
-                initialValue = emptyList()
-            )
-    }
-    val authState: StateFlow<AuthState?>
+    private val _favorites = MutableStateFlow<List<Music>>(emptyList())
+    val favorites: StateFlow<List<Music>> = _favorites.asStateFlow()
+
+    private val _authState = MutableStateFlow<AuthState?>(null)
+    val authState: StateFlow<AuthState?> = _authState.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            getFavoritesUseCase().collect {
+                _favorites.value = it
+            }
+        }
 
-        authState = viewModelScope.run {
-            getAuthStateUseCase()
-                .stateIn(
-                    scope = this,
-                    started = SharingStarted.WhileSubscribed(5000),
-                    initialValue = null
-                )
+        viewModelScope.launch {
+            getAuthStateUseCase().collect {
+                _authState.value = it
+            }
         }
     }
 
