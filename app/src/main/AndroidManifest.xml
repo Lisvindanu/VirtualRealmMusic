@@ -18,8 +18,9 @@
         tools:targetApi="31">
 
         <activity
-            android:name=".ui.main.MainActivity"
-            android:exported="true">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.VirtualRealmMusicPlayer">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -29,7 +30,8 @@
         <!-- Spotify Authentication Callback -->
         <activity
             android:name=".ui.auth.SpotifyAuthActivity"
-            android:exported="true">
+            android:exported="true"
+            android:theme="@style/Theme.VirtualRealmMusicPlayer">
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

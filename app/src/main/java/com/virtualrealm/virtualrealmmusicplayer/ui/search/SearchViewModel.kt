@@ -1,8 +1,6 @@
-// ui/search/SearchViewModel.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/search/SearchViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.search
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
@@ -11,8 +9,14 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.GetAuthStateUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.SearchMusicUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.ToggleFavoriteUseCase
+import com.virtualrealm.virtualrealmmusicplayer.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -20,44 +24,42 @@ import javax.inject.Inject
 class SearchViewModel @Inject constructor(
     private val searchMusicUseCase: SearchMusicUseCase,
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    private val getAuthStateUseCase: GetAuthStateUseCase
+    getAuthStateUseCase: GetAuthStateUseCase
 ) : ViewModel() {
 
-    private val _searchResults = MutableLiveData<Resource<List<Music>>>()
-    val searchResults: LiveData<Resource<List<Music>>> = _searchResults
+    private val _searchResults = MutableStateFlow<Resource<List<Music>>>(Resource.Success(emptyList()))
+    val searchResults: StateFlow<Resource<List<Music>>> = _searchResults.asStateFlow()
 
-    private val _authState = MutableLiveData<AuthState>()
-    val authState: LiveData<AuthState> = _authState
+    val authState: StateFlow<AuthState?> = getAuthStateUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
 
-    private var selectedSource = SearchMusicUseCase.MusicSource.YOUTUBE
-    private var currentQuery = ""
+    private val _selectedSource = MutableStateFlow(SearchMusicUseCase.MusicSource.YOUTUBE)
+    val selectedSource: StateFlow<SearchMusicUseCase.MusicSource> = _selectedSource.asStateFlow()
 
-    init {
-        getAuthState()
-    }
-
-    private fun getAuthState() {
-        viewModelScope.launch {
-            getAuthStateUseCase().collect { state ->
-                _authState.value = state
-            }
-        }
-    }
+    private val _currentQuery = MutableStateFlow("")
+    val currentQuery: StateFlow<String> = _currentQuery.asStateFlow()
 
     fun setMusicSource(source: SearchMusicUseCase.MusicSource) {
-        selectedSource = source
-        if (currentQuery.isNotBlank()) {
-            searchMusic(currentQuery)
+        _selectedSource.value = source
+        if (_currentQuery.value.isNotBlank()) {
+            searchMusic(_currentQuery.value)
         }
     }
 
     fun searchMusic(query: String) {
-        if (query.isBlank()) return
+        if (query.isBlank()) {
+            _searchResults.value = Resource.Success(emptyList())
+            return
+        }
 
-        currentQuery = query
-
+        _currentQuery.value = query
         viewModelScope.launch {
-            searchMusicUseCase(query, selectedSource).collect { result ->
+            _searchResults.value = Resource.Loading
+            searchMusicUseCase(query, _selectedSource.value).collectLatest { result ->
                 _searchResults.value = result
             }
         }

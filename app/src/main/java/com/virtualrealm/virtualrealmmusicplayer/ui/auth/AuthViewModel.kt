@@ -1,8 +1,6 @@
-// ui/auth/AuthViewModel.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/auth/AuthViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.auth
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
@@ -13,6 +11,10 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.GetAuthState
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.LogoutUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.RefreshSpotifyTokenUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,11 +27,11 @@ class AuthViewModel @Inject constructor(
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    private val _authState = MutableLiveData<AuthState>()
-    val authState: LiveData<AuthState> = _authState
+    private val _authState = MutableStateFlow<AuthState?>(null)
+    val authState: StateFlow<AuthState?> = _authState.asStateFlow()
 
-    private val _authResult = MutableLiveData<Resource<AuthState>>()
-    val authResult: LiveData<Resource<AuthState>> = _authResult
+    private val _authResult = MutableStateFlow<Resource<AuthState>?>(null)
+    val authResult: StateFlow<Resource<AuthState>?> = _authResult.asStateFlow()
 
     init {
         getAuthState()
@@ -37,7 +39,7 @@ class AuthViewModel @Inject constructor(
 
     private fun getAuthState() {
         viewModelScope.launch {
-            getAuthStateUseCase().collect { state ->
+            getAuthStateUseCase().collectLatest { state ->
                 _authState.value = state
             }
         }
@@ -49,7 +51,7 @@ class AuthViewModel @Inject constructor(
 
     fun exchangeCodeForToken(code: String) {
         viewModelScope.launch {
-            exchangeSpotifyCodeUseCase(code).collect { result ->
+            exchangeSpotifyCodeUseCase(code).collectLatest { result ->
                 _authResult.value = result
             }
         }
@@ -57,7 +59,7 @@ class AuthViewModel @Inject constructor(
 
     fun refreshToken() {
         viewModelScope.launch {
-            refreshSpotifyTokenUseCase().collect { result ->
+            refreshSpotifyTokenUseCase().collectLatest { result ->
                 _authResult.value = result
             }
         }
@@ -66,6 +68,8 @@ class AuthViewModel @Inject constructor(
     fun logout() {
         viewModelScope.launch {
             logoutUseCase()
+            _authResult.value = null
         }
     }
 }
+

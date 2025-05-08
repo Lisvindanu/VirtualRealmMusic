@@ -1,8 +1,12 @@
-// di/NetworkModule.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/di/NetworkModule.kt
 package com.virtualrealm.virtualrealmmusicplayer.di
 
+import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.YouTubeApi
+import com.virtualrealm.virtualrealmmusicplayer.data.remote.service.AuthAuthenticator
+import com.virtualrealm.virtualrealmmusicplayer.data.remote.service.TokenInterceptor
+import com.virtualrealm.virtualrealmmusicplayer.util.Constants
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -21,25 +25,63 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideOkHttpClient(): OkHttpClient {
-        val loggingInterceptor = HttpLoggingInterceptor().apply {
+    fun provideHttpLoggingInterceptor(): HttpLoggingInterceptor {
+        return HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY
         }
+    }
 
+    @Provides
+    @Singleton
+    fun provideTokenInterceptor(authPreferences: AuthPreferences): TokenInterceptor {
+        return TokenInterceptor(authPreferences)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAuthAuthenticator(
+        spotifyApi: SpotifyApi,
+        authPreferences: AuthPreferences
+    ): AuthAuthenticator {
+        return AuthAuthenticator(spotifyApi, authPreferences)
+    }
+
+    @Provides
+    @Singleton
+    @Named("baseOkHttpClient")
+    fun provideBaseOkHttpClient(
+        loggingInterceptor: HttpLoggingInterceptor
+    ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(loggingInterceptor)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(Constants.NETWORK_TIMEOUT, TimeUnit.SECONDS)
+            .readTimeout(Constants.NETWORK_TIMEOUT, TimeUnit.SECONDS)
+            .writeTimeout(Constants.NETWORK_TIMEOUT, TimeUnit.SECONDS)
             .build()
     }
 
     @Provides
     @Singleton
-    @Named("spotifyRetrofit")
-    fun provideSpotifyRetrofit(okHttpClient: OkHttpClient): Retrofit {
+    @Named("authenticatedOkHttpClient")
+    fun provideAuthenticatedOkHttpClient(
+        @Named("baseOkHttpClient") baseOkHttpClient: OkHttpClient,
+        tokenInterceptor: TokenInterceptor,
+        authAuthenticator: AuthAuthenticator
+    ): OkHttpClient {
+        return baseOkHttpClient.newBuilder()
+            .addInterceptor(tokenInterceptor)
+            .authenticator(authAuthenticator)
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @Named("spotifyAuthRetrofit")
+    fun provideSpotifyAuthRetrofit(
+        @Named("baseOkHttpClient") okHttpClient: OkHttpClient
+    ): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://accounts.spotify.com/")
+            .baseUrl(Constants.SPOTIFY_ACCOUNTS_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -48,9 +90,11 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("spotifyApiRetrofit")
-    fun provideSpotifyApiRetrofit(okHttpClient: OkHttpClient): Retrofit {
+    fun provideSpotifyApiRetrofit(
+        @Named("authenticatedOkHttpClient") okHttpClient: OkHttpClient
+    ): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://api.spotify.com/")
+            .baseUrl(Constants.SPOTIFY_API_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -59,9 +103,11 @@ object NetworkModule {
     @Provides
     @Singleton
     @Named("youtubeRetrofit")
-    fun provideYoutubeRetrofit(okHttpClient: OkHttpClient): Retrofit {
+    fun provideYoutubeRetrofit(
+        @Named("baseOkHttpClient") okHttpClient: OkHttpClient
+    ): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://www.googleapis.com/")
+            .baseUrl(Constants.YOUTUBE_API_BASE_URL)
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -69,13 +115,20 @@ object NetworkModule {
 
     @Provides
     @Singleton
-    fun provideSpotifyApi(@Named("spotifyRetrofit") retrofit: Retrofit): SpotifyApi {
-        return retrofit.create(SpotifyApi::class.java)
+    fun provideSpotifyApi(
+        @Named("spotifyAuthRetrofit") spotifyAuthRetrofit: Retrofit,
+        @Named("spotifyApiRetrofit") spotifyApiRetrofit: Retrofit
+    ): SpotifyApi {
+        // For simplicity, we're using the auth retrofit for both auth and API
+        // In a real-world app, you might want to create separate API interfaces
+        return spotifyAuthRetrofit.create(SpotifyApi::class.java)
     }
 
     @Provides
     @Singleton
-    fun provideYoutubeApi(@Named("youtubeRetrofit") retrofit: Retrofit): YouTubeApi {
-        return retrofit.create(YouTubeApi::class.java)
+    fun provideYoutubeApi(
+        @Named("youtubeRetrofit") youtubeRetrofit: Retrofit
+    ): YouTubeApi {
+        return youtubeRetrofit.create(YouTubeApi::class.java)
     }
 }

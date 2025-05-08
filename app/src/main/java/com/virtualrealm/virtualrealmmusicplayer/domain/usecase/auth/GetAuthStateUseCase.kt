@@ -1,4 +1,4 @@
-// domain/usecase/auth/GetAuthStateUseCase.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/domain/usecase/auth/GetAuthStateUseCase.kt
 package com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth
 
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState

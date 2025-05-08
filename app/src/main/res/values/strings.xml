@@ -1,3 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">VirtualRealmMusicPlayer</string>
+    <string name="app_name">Virtual Realm Music Player</string>
+
+    <!-- Common -->
+    <string name="home">Home</string>
+    <string name="search">Search</string>
+    <string name="player">Player</string>
+    <string name="back">Back</string>
+    <string name="spotify">Spotify</string>
+    <string name="youtube">YouTube</string>
+    <string name="retry">Retry</string>
+    <string name="unknown_error">Unknown error occurred</string>
+
+    <!-- Login -->
+    <string name="login_with_spotify">Login with Spotify</string>
+    <string name="skip_login">Skip Login</string>
+    <string name="login_description">Connect to Spotify to enjoy millions of songs and create your own playlist</string>
+
+    <!-- Home -->
+    <string name="spotify_connected">Spotify Connected</string>
+    <string name="spotify_not_connected">Spotify Not Connected</string>
+    <string name="connect_spotify">Connect Spotify</string>
+    <string name="no_favorites">No favorites yet</string>
+    <string name="search_music">Search Music</string>
+    <string name="logout">Logout</string>
+
+    <!-- Search -->
+    <string name="search_hint">Search for songs, artists, or albums</string>
+    <string name="no_results_found">No results found</string>
+    <string name="search_prompt">Start searching for your favorite music</string>
+    <string name="spotify_not_connected_message">Please connect to Spotify to search for Spotify tracks</string>
+    <string name="clear">Clear</string>
+
+    <!-- Player -->
+    <string name="now_playing">Now Playing</string>
+    <string name="add_to_favorites">Add to favorites</string>
+    <string name="remove_from_favorites">Remove from favorites</string>
+
+    <!-- Errors -->
+    <string name="network_error">Network error. Please check your internet connection.</string>
+    <string name="spotify_auth_error">Authentication with Spotify failed</string>
+    <string name="search_error">Failed to search for music</string>
 </resources>

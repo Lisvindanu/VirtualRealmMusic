@@ -1,9 +1,6 @@
-
-// ui/home/HomeViewModel.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/home/HomeViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.home
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
@@ -13,48 +10,44 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.LogoutUseCas
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.GetFavoritesUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    private val getFavoritesUseCase: GetFavoritesUseCase,
+    getFavoritesUseCase: GetFavoritesUseCase,
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    private val getAuthStateUseCase: GetAuthStateUseCase,
+    getAuthStateUseCase: GetAuthStateUseCase,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    private val _favorites = MutableLiveData<List<Music>>()
-    val favorites: LiveData<List<Music>> = _favorites
+    val favorites: StateFlow<List<Music>> = getFavoritesUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
 
-    private val _authState = MutableLiveData<AuthState>()
-    val authState: LiveData<AuthState> = _authState
+    val authState: StateFlow<AuthState?> = getAuthStateUseCase()
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = null
+        )
 
-    init {
-        loadFavorites()
-        getAuthState()
-    }
-
-    private fun loadFavorites() {
-        viewModelScope.launch {
-            getFavoritesUseCase().collect { musicList ->
-                _favorites.value = musicList
-            }
-        }
-    }
-
-    private fun getAuthState() {
-        viewModelScope.launch {
-            getAuthStateUseCase().collect { state ->
-                _authState.value = state
-            }
-        }
-    }
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     fun toggleFavorite(music: Music) {
         viewModelScope.launch {
+            _isLoading.value = true
             toggleFavoriteUseCase(music)
-            // The favorites will be automatically updated through the Flow
+            _isLoading.value = false
         }
     }
 
@@ -64,3 +57,4 @@ class HomeViewModel @Inject constructor(
         }
     }
 }
+
