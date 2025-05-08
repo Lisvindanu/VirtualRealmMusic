@@ -10,12 +10,7 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.GetAuthState
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.SearchMusicUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.ToggleFavoriteUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -29,7 +24,11 @@ class SearchViewModel @Inject constructor(
     private val _searchResults = MutableStateFlow<Resource<List<Music>>>(Resource.Success(emptyList()))
     val searchResults: StateFlow<Resource<List<Music>>> = _searchResults.asStateFlow()
 
-    val authState: StateFlow<AuthState?> = getAuthStateUseCase.invoke()
+    // Buat metode non-suspend untuk mendapatkan Flow dari use case
+    private fun getAuthStateFlow() = getAuthStateUseCase()
+
+    // Gunakan extension function untuk mengubah Flow menjadi StateFlow
+    val authState: StateFlow<AuthState?> = getAuthStateFlow()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

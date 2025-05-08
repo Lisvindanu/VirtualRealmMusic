@@ -13,13 +13,21 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    getAuthStateUseCase: GetAuthStateUseCase
+    private val getAuthStateUseCase: GetAuthStateUseCase
 ) : ViewModel() {
 
-    val authState: StateFlow<AuthState?> = getAuthStateUseCase()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    // Initialize StateFlow in the proper way
+    val authState: StateFlow<AuthState?>
+
+    init {
+        // Initialize StateFlow in a coroutine-safe way
+        authState = viewModelScope.run {
+            getAuthStateUseCase()
+                .stateIn(
+                    scope = this,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = null
+                )
+        }
+    }
 }

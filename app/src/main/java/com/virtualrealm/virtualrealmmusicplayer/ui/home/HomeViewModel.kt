@@ -20,28 +20,39 @@ import javax.inject.Inject
 
 @HiltViewModel
 class HomeViewModel @Inject constructor(
-    getFavoritesUseCase: GetFavoritesUseCase,
+    private val getFavoritesUseCase: GetFavoritesUseCase,
     private val toggleFavoriteUseCase: ToggleFavoriteUseCase,
-    getAuthStateUseCase: GetAuthStateUseCase,
+    private val getAuthStateUseCase: GetAuthStateUseCase,
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    val favorites: StateFlow<List<Music>> = getFavoritesUseCase.invoke()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
-
-    val authState: StateFlow<AuthState?> = getAuthStateUseCase.invoke()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = null
-        )
+    // Initialize StateFlows in init block
+    val favorites: StateFlow<List<Music>>
+    val authState: StateFlow<AuthState?>
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    init {
+        // Initialize StateFlow in a coroutine-safe way
+        favorites = viewModelScope.run {
+            getFavoritesUseCase()
+                .stateIn(
+                    scope = this,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = emptyList()
+                )
+        }
+
+        authState = viewModelScope.run {
+            getAuthStateUseCase()
+                .stateIn(
+                    scope = this,
+                    started = SharingStarted.WhileSubscribed(5000),
+                    initialValue = null
+                )
+        }
+    }
 
     fun toggleFavorite(music: Music) {
         viewModelScope.launch {
