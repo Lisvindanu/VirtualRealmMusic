@@ -36,6 +36,8 @@ import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 import javax.inject.Inject
+import android.util.Log
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
@@ -225,35 +227,69 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
+    // Di bagian onPrepared pada MusicService.kt
+
+
+    // Tambahkan di fun playMusic()
+    // Perbaikan untuk method playMusic di MusicService.kt
+
     fun playMusic(music: Music) {
         lifecycleScope.launch {
             try {
+                Log.d("MusicService", "Starting to play music: ${music.title}")
                 _playbackState.value = PlaybackState.PREPARING
                 currentMusic = music
                 _currentTrack.value = music
 
-                // Request audio focus
-                requestAudioFocus()
-
-                // Reset and prepare media player
-                mediaPlayer?.reset()
-
-                // Extract audio URL from the music
-                val audioUrl = musicExtractionService.extractAudioUrl(music)
-
-                withContext(Dispatchers.IO) {
-                    mediaPlayer?.setDataSource(audioUrl)
-                    mediaPlayer?.prepareAsync()
+                // Reset media player
+                withContext(Dispatchers.Main) {
+                    try {
+                        mediaPlayer?.reset()
+                        Log.d("MusicService", "MediaPlayer reset successful")
+                    } catch (e: Exception) {
+                        Log.e("MusicService", "Error resetting MediaPlayer: ${e.message}", e)
+                    }
                 }
 
-                // Load album art for notification
-                loadAlbumArt(music.thumbnailUrl)
+                // Dapatkan URL audio
+                Log.d("MusicService", "Extracting audio URL for: ${music.id}")
+                val audioUrl = try {
+                    musicExtractionService.extractAudioUrl(music)
+                } catch (e: Exception) {
+                    Log.e("MusicService", "Error extracting audio URL: ${e.message}", e)
+                    // Fallback URL jika gagal
+                    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+                }
 
-                // Update media session metadata
+                Log.d("MusicService", "Using audio URL: $audioUrl")
+
+                // Set data source dan prepare MediaPlayer
+                withContext(Dispatchers.IO) {
+                    try {
+                        // Cara 1: Gunakan setDataSource sederhana
+                        mediaPlayer?.setDataSource(audioUrl)
+
+                        // Cara 2: Jika perlu User-Agent, gunakan ini
+                        // val headers = HashMap<String, String>()
+                        // headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
+                        // mediaPlayer?.setDataSource(applicationContext, Uri.parse(audioUrl), headers)
+
+                        Log.d("MusicService", "Set data source success")
+                        mediaPlayer?.prepareAsync()
+                        Log.d("MusicService", "Preparing media player asynchronously")
+                    } catch (e: Exception) {
+                        Log.e("MusicService", "Error preparing media player: ${e.message}", e)
+                        _playbackState.value = PlaybackState.ERROR
+                    }
+                }
+
+                // Update UI elements
+                loadAlbumArt(music.thumbnailUrl)
                 updateMediaSessionMetadata(music)
-            } catch (e: IOException) {
+
+            } catch (e: Exception) {
+                Log.e("MusicService", "Error in playMusic: ${e.message}", e)
                 _playbackState.value = PlaybackState.ERROR
-                e.printStackTrace()
             }
         }
     }
@@ -478,24 +514,58 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         return START_NOT_STICKY
     }
 
-    override fun onPrepared(mp: MediaPlayer?) {
-        mediaPlayer?.start()
-        _playbackState.value = PlaybackState.PLAYING
-        updatePlaybackState(PlaybackState.PLAYING)
+// Tambahkan fungsi logPlaybackState di kelas MusicService
 
-        // Use the appropriate overload based on API level
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-        } else {
-            startForeground(NOTIFICATION_ID, createNotification())
+    /**
+     * Log informasi status pemutaran untuk membantu debugging
+     */
+    private fun logPlaybackState(state: PlaybackState, additionalInfo: String = "") {
+        val stateStr = when (state) {
+            PlaybackState.IDLE -> "IDLE"
+            PlaybackState.PREPARING -> "PREPARING"
+            PlaybackState.PLAYING -> "PLAYING"
+            PlaybackState.PAUSED -> "PAUSED"
+            PlaybackState.STOPPED -> "STOPPED"
+            PlaybackState.ERROR -> "ERROR"
+        }
+
+        val positionMs = mediaPlayer?.currentPosition ?: -1
+        val durationMs = mediaPlayer?.duration ?: -1
+        val musicInfo = currentMusic?.let { "${it.title} (${it.id})" } ?: "No music"
+
+        Log.d("MusicService", "Playback state: $stateStr | Music: $musicInfo | Position: ${positionMs}ms/${durationMs}ms | $additionalInfo")
+    }
+
+    override fun onPrepared(mp: MediaPlayer?) {
+        try {
+            Log.d("MusicService", "Media player prepared successfully!")
+            mediaPlayer?.start()
+            _playbackState.value = PlaybackState.PLAYING
+            updatePlaybackState(PlaybackState.PLAYING)
+
+            // Log kondisi pemutaran
+            logPlaybackState(PlaybackState.PLAYING, "Media player prepared and started")
+
+            // Pindahkan ke foreground dengan notifikasi
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            } else {
+                startForeground(NOTIFICATION_ID, createNotification())
+            }
+        } catch (e: Exception) {
+            Log.e("MusicService", "Error starting playback: ${e.message}", e)
+            _playbackState.value = PlaybackState.ERROR
+            logPlaybackState(PlaybackState.ERROR, "Error starting playback: ${e.message}")
         }
     }
 
     override fun onError(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
+        Log.e("MusicService", "Media player error: what=$what, extra=$extra")
         _playbackState.value = PlaybackState.ERROR
         updatePlaybackState(PlaybackState.STOPPED)
         return true
     }
+
 
     override fun onCompletion(mp: MediaPlayer?) {
         // When current track completes, play next track

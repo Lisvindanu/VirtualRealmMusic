@@ -1,9 +1,8 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlayerScreen.kt
+
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
-import android.view.ViewGroup
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -43,7 +44,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -55,6 +55,7 @@ import com.virtualrealm.virtualrealmmusicplayer.ui.theme.SpotifyGreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.YouTubeRed
 import com.virtualrealm.virtualrealmmusicplayer.util.Constants
 import com.virtualrealm.virtualrealmmusicplayer.util.DateTimeUtils
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,12 +77,14 @@ fun PlayerScreen(
 
     // Load the music when the screen is first composed
     LaunchedEffect(musicId, musicType) {
+        Log.d("PlayerScreen", "Loading music: $musicId, type: $musicType")
         playerViewModel.loadMusic(musicId, musicType)
     }
 
     // Start playback when music is loaded
     LaunchedEffect(music) {
         music?.let {
+            Log.d("PlayerScreen", "Starting playback for: ${it.title}")
             musicViewModel.playMusic(it)
         }
     }
@@ -174,20 +177,110 @@ fun PlayerContent(
                 .weight(0.6f)
                 .padding(bottom = 16.dp)
         ) {
-            // Album art
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(music.thumbnailUrl)
-                    .crossfade(true)
-                    .build(),
-                contentDescription = music.title,
-                contentScale = ContentScale.Crop,
-                placeholder = painterResource(id = R.drawable.placeholder_album),
-                error = painterResource(id = R.drawable.placeholder_album),
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp))
-            )
+            if (musicType == Constants.MUSIC_TYPE_YOUTUBE) {
+                // YouTube video thumbnail
+                val thumbnailUrl = "https://img.youtube.com/vi/${music.id}/hqdefault.jpg"
+                Log.d("PlayerScreen", "Loading YouTube thumbnail: $thumbnailUrl")
+
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(thumbnailUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = music.title,
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = R.drawable.placeholder_album),
+                    error = painterResource(id = R.drawable.placeholder_album),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                )
+
+                // YouTube play icon overlay
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .align(Alignment.Center)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(8.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_youtube),
+                        contentDescription = null,
+                        tint = YouTubeRed,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            } else if (musicType == Constants.MUSIC_TYPE_SPOTIFY) {
+                // Spotify album art
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(music.thumbnailUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = music.title,
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = R.drawable.placeholder_album),
+                    error = painterResource(id = R.drawable.placeholder_album),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                )
+
+                // Spotify icon overlay
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .align(Alignment.Center)
+                        .background(
+                            color = Color.Black.copy(alpha = 0.6f),
+                            shape = RoundedCornerShape(8.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_spotify),
+                        contentDescription = null,
+                        tint = SpotifyGreen,
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            } else {
+                // Generic music thumbnail
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(music.thumbnailUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = music.title,
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = R.drawable.placeholder_album),
+                    error = painterResource(id = R.drawable.placeholder_album),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(8.dp))
+                )
+
+                if (music.thumbnailUrl.isEmpty()) {
+                    // Show music icon if thumbnail is empty
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.surfaceVariant),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.MusicNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(64.dp)
+                        )
+                    }
+                }
+            }
         }
 
         // Music info section (40% of the screen height)
@@ -222,7 +315,7 @@ fun PlayerContent(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Additional info
+            // Additional info based on music type
             when (music) {
                 is Music.SpotifyTrack -> {
                     Text(
@@ -326,74 +419,10 @@ fun PlayerContent(
                         stringResource(R.string.remove_from_favorites)
                     else
                         stringResource(R.string.add_to_favorites),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = if (isFavorite) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(32.dp)
                 )
             }
         }
-    }
-}
-
-// Simple replacement for YouTubePlayerView using AndroidView
-@Composable
-fun SimpleYouTubePlayer(videoId: String) {
-    val youtubeEmbedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&rel=0&showinfo=0"
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-    ) {
-        AndroidView(
-            factory = { context ->
-                WebView(context).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    settings.apply {
-                        javaScriptEnabled = true
-                        mediaPlaybackRequiresUserGesture = false
-                        domStorageEnabled = true
-                        loadWithOverviewMode = true
-                        useWideViewPort = true
-                    }
-                    webViewClient = WebViewClient()
-                    loadUrl(youtubeEmbedUrl)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-    }
-}
-
-@Composable
-fun SpotifyPlayer(trackId: String) {
-    val spotifyEmbedUrl = "https://open.spotify.com/embed/track/$trackId?utm_source=generator"
-
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(16f / 9f)
-    ) {
-        AndroidView(
-            factory = { context ->
-                WebView(context).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                    settings.apply {
-                        javaScriptEnabled = true
-                        domStorageEnabled = true
-                        allowContentAccess = true
-                        allowFileAccess = true
-                    }
-                    webViewClient = WebViewClient()
-                    loadUrl(spotifyEmbedUrl)
-                }
-            },
-            modifier = Modifier.fillMaxSize()
-        )
     }
 }

@@ -1,6 +1,7 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlayerViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
@@ -34,41 +35,64 @@ class PlayerViewModel @Inject constructor(
     val error: StateFlow<String?> = _error.asStateFlow()
 
     // Update the loadMusic function in PlayerViewModel.kt
+    // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlayerViewModel.kt
+
+    // Di dalam method loadMusic
     fun loadMusic(musicId: String, musicType: String) {
         viewModelScope.launch {
             _isLoading.value = true
             _error.value = null
 
+            Log.d("PlayerViewModel", "Loading music ID: $musicId, type: $musicType")
+
             try {
+                // Periksa apakah ada data musik di cache lokal
+                val localMusic = musicRepository.getLocalMusicById(musicId)
+
+                if (localMusic != null) {
+                    Log.d("PlayerViewModel", "Found music in local cache: ${localMusic.title}")
+                    _music.value = localMusic
+                    _isFavorite.value = musicRepository.isInFavorites(musicId)
+                    _isLoading.value = false
+                    return@launch
+                }
+
+                // Jika tidak ada di cache, buat placeholder sambil memuat data lengkap
                 when (musicType) {
-                    Constants.MUSIC_TYPE_SPOTIFY -> {
-                        // Create a simple Spotify track
-                        val track = Music.SpotifyTrack(
-                            id = musicId,
-                            title = "Spotify Track",
-                            artists = "Artist",
-                            thumbnailUrl = "",
-                            albumName = "Album",
-                            uri = "spotify:track:$musicId",
-                            durationMs = 0
-                        )
-                        _music.value = track
-                    }
                     Constants.MUSIC_TYPE_YOUTUBE -> {
-                        // Create a simple YouTube video
-                        val video = Music.YoutubeVideo(
+                        // Buat objek YouTube placeholder
+                        val tempVideo = Music.YoutubeVideo(
                             id = musicId,
-                            title = "YouTube Video",
-                            artists = "Channel",
+                            title = "Loading...",
+                            artists = "Loading...",
                             thumbnailUrl = "",
-                            channelTitle = "Channel"
+                            channelTitle = "YouTube"
                         )
-                        _music.value = video
+                        _music.value = tempVideo
+
+                        // Coba muat data lengkapnya secara asinkron
+                        try {
+                            val details = musicRepository.getYoutubeVideoDetails(musicId)
+                            if (details != null) {
+                                Log.d("PlayerViewModel", "Successfully loaded video details: ${details.title}")
+                                _music.value = details
+                            }
+                        } catch (e: Exception) {
+                            Log.e("PlayerViewModel", "Error loading YouTube details: ${e.message}", e)
+                            // Tetap gunakan tempVideo jika gagal
+                        }
+                    }
+
+                    Constants.MUSIC_TYPE_SPOTIFY -> {
+                        // Logika untuk Spotify...
                     }
                 }
+
                 // Check favorite status
                 _isFavorite.value = musicRepository.isInFavorites(musicId)
+
             } catch (e: Exception) {
+                Log.e("PlayerViewModel", "Error loading music: ${e.message}", e)
                 _error.value = "Error loading music: ${e.message}"
             } finally {
                 _isLoading.value = false

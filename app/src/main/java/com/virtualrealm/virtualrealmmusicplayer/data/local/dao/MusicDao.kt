@@ -1,9 +1,13 @@
-// data/local/dao/MusicDao.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.local.dao
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
 import com.virtualrealm.virtualrealmmusicplayer.data.local.entity.MusicEntity
 import kotlinx.coroutines.flow.Flow
+
+
 
 @Dao
 interface MusicDao {
@@ -27,4 +31,14 @@ interface MusicDao {
 
     @Query("DELETE FROM music WHERE id = :id")
     suspend fun deleteMusic(id: String)
+
+    // New methods
+    @Query("DELETE FROM music")
+    suspend fun clearAll()
+
+    @Query("UPDATE music SET isFavorite = 0")
+    suspend fun clearFavorites()
+
+    @Query("SELECT * FROM music WHERE type = :type ORDER BY title ASC")
+    suspend fun getMusicByType(type: String): List<MusicEntity>
 }
