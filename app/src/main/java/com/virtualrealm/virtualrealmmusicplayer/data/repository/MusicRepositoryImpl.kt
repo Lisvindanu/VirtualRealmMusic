@@ -1,8 +1,6 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/repository/MusicRepositoryImpl.kt
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/repository/MusicRepositoryImpl.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.repository
 
-
-import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.local.dao.MusicDao
 import com.virtualrealm.virtualrealmmusicplayer.data.local.entity.MusicEntity
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
@@ -10,6 +8,7 @@ import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.YouTubeApi
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
 import com.virtualrealm.virtualrealmmusicplayer.domain.repository.MusicRepository
+import com.virtualrealm.virtualrealmmusicplayer.util.ApiCredentials
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
@@ -39,7 +38,7 @@ class MusicRepositoryImpl @Inject constructor(
             emit(Resource.Loading)
             val response = youtubeApi.searchVideos(
                 query = query,
-                apiKey = BuildConfig.YOUTUBE_API_KEY
+                apiKey = ApiCredentials.YOUTUBE_API_KEY
             )
             val videos = response.items.mapNotNull { it.toYouTubeVideo() }
             emit(Resource.Success(videos))
@@ -48,7 +47,6 @@ class MusicRepositoryImpl @Inject constructor(
         }
     }
 
-    // Remove suspend keyword here
     override fun getFavorites(): Flow<List<Music>> {
         return musicDao.getFavorites().map { entities ->
             entities.map { it.toMusic() }

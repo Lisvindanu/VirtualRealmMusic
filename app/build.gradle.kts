@@ -1,4 +1,20 @@
 // app/build.gradle.kts
+// Perbaikan cara loading local.properties
+
+import java.io.FileInputStream
+import java.util.Properties
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
+
+fun getProperty(key: String, defaultValue: String): String {
+    return localProperties.getProperty(key, defaultValue)
+}
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -20,13 +36,13 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Spotify API credentials
-        buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"1cc6b4968a154bc686aba8caf0dbd1c0\"")
-        buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"4a33faf4d0ed45708ab452c6450882e5\"")
-        buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"com.virtualrealm.virtualrealmmusicplayer://callback\"")
+        // Spotify API credentials - dari local.properties
+        buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${getProperty("spotify.client.id", "")}\"")
+        buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${getProperty("spotify.client.secret", "")}\"")
+        buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"${getProperty("spotify.redirect.uri", "")}\"")
 
-        // YouTube API key
-        buildConfigField("String", "YOUTUBE_API_KEY", "\"AIzaSyCvMokdapr1y3mdVbirFdHMAuJpp3BhUXY\"")
+        // YouTube API key - dari local.properties
+        buildConfigField("String", "YOUTUBE_API_KEY", "\"${getProperty("youtube.api.key", "")}\"")
     }
 
     buildTypes {

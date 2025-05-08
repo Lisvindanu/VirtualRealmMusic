@@ -1,3 +1,4 @@
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/search/SearchViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.search
 
 import androidx.lifecycle.ViewModel
@@ -28,7 +29,7 @@ class SearchViewModel @Inject constructor(
     private val _searchResults = MutableStateFlow<Resource<List<Music>>>(Resource.Success(emptyList()))
     val searchResults: StateFlow<Resource<List<Music>>> = _searchResults.asStateFlow()
 
-    val authState: StateFlow<AuthState?> = getAuthStateUseCase()
+    val authState: StateFlow<AuthState?> = getAuthStateUseCase.invoke()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

@@ -1,7 +1,6 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/remote/service/MusicService.kt
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/remote/service/MusicService.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.remote.service
 
-import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.YouTubeApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.dto.SpotifySearchResponse
@@ -9,6 +8,7 @@ import com.virtualrealm.virtualrealmmusicplayer.data.remote.dto.YouTubeSearchRes
 import com.virtualrealm.virtualrealmmusicplayer.data.util.NetworkConnectivityHelper
 import com.virtualrealm.virtualrealmmusicplayer.data.util.safeApiCall
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
+import com.virtualrealm.virtualrealmmusicplayer.util.ApiCredentials
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -46,7 +46,7 @@ class MusicService @Inject constructor(
         return safeApiCall {
             youtubeApi.searchVideos(
                 query = query,
-                apiKey = BuildConfig.YOUTUBE_API_KEY
+                apiKey = ApiCredentials.YOUTUBE_API_KEY
             )
         }
     }

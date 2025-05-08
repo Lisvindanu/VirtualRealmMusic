@@ -1,4 +1,4 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/MainActivity.kt
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/MainActivity.kt
 package com.virtualrealm.virtualrealmmusicplayer
 
 import android.os.Bundle

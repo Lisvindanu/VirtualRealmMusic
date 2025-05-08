@@ -1,4 +1,4 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/home/HomeViewModel.kt
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/home/HomeViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.home
 
 import androidx.lifecycle.ViewModel
@@ -26,14 +26,14 @@ class HomeViewModel @Inject constructor(
     private val logoutUseCase: LogoutUseCase
 ) : ViewModel() {
 
-    val favorites: StateFlow<List<Music>> = getFavoritesUseCase()
+    val favorites: StateFlow<List<Music>> = getFavoritesUseCase.invoke()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = emptyList()
         )
 
-    val authState: StateFlow<AuthState?> = getAuthStateUseCase()
+    val authState: StateFlow<AuthState?> = getAuthStateUseCase.invoke()
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),

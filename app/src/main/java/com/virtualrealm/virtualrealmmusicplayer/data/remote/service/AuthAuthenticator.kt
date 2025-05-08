@@ -1,10 +1,9 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/remote/service/AuthAuthenticator.kt
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/remote/service/AuthAuthenticator.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.remote.service
 
-
-import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
+import com.virtualrealm.virtualrealmmusicplayer.util.ApiCredentials
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator
@@ -41,8 +40,8 @@ class AuthAuthenticator @Inject constructor(
             try {
                 val tokenResponse = spotifyApi.refreshToken(
                     refreshToken = authState.refreshToken,
-                    clientId = BuildConfig.SPOTIFY_CLIENT_ID,
-                    clientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET
+                    clientId = ApiCredentials.SPOTIFY_CLIENT_ID,
+                    clientSecret = ApiCredentials.SPOTIFY_CLIENT_SECRET
                 )
 
                 // Update auth state

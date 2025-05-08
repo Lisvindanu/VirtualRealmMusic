@@ -1,13 +1,13 @@
-// data/repository/AuthRepositoryImpl.kt
+// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/repository/AuthRepositoryImpl.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.repository
 
 import android.net.Uri
-import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
 import com.virtualrealm.virtualrealmmusicplayer.domain.repository.AuthRepository
+import com.virtualrealm.virtualrealmmusicplayer.util.ApiCredentials
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
@@ -41,14 +41,14 @@ class AuthRepositoryImpl @Inject constructor(
 
             val response = spotifyApi.refreshToken(
                 refreshToken = refreshToken,
-                clientId = BuildConfig.SPOTIFY_CLIENT_ID,
-                clientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET
+                clientId = ApiCredentials.SPOTIFY_CLIENT_ID,
+                clientSecret = ApiCredentials.SPOTIFY_CLIENT_SECRET
             )
 
             val newAuthState = AuthState(
                 isAuthenticated = true,
                 accessToken = response.accessToken,
-                refreshToken = response.refreshToken ?: refreshToken, // Keep old refresh token if not provided
+                refreshToken = response.refreshToken ?: refreshToken,
                 expiresIn = response.expiresIn,
                 tokenType = response.tokenType
             )
@@ -66,9 +66,9 @@ class AuthRepositoryImpl @Inject constructor(
             val response = spotifyApi.getToken(
                 grantType = "authorization_code",
                 code = code,
-                redirectUri = BuildConfig.SPOTIFY_REDIRECT_URI,
-                clientId = BuildConfig.SPOTIFY_CLIENT_ID,
-                clientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET
+                redirectUri = ApiCredentials.SPOTIFY_REDIRECT_URI,
+                clientId = ApiCredentials.SPOTIFY_CLIENT_ID,
+                clientSecret = ApiCredentials.SPOTIFY_CLIENT_SECRET
             )
 
             val authState = AuthState(
@@ -91,9 +91,9 @@ class AuthRepositoryImpl @Inject constructor(
             .scheme("https")
             .authority("accounts.spotify.com")
             .appendPath("authorize")
-            .appendQueryParameter("client_id", BuildConfig.SPOTIFY_CLIENT_ID)
+            .appendQueryParameter("client_id", ApiCredentials.SPOTIFY_CLIENT_ID)
             .appendQueryParameter("response_type", "code")
-            .appendQueryParameter("redirect_uri", BuildConfig.SPOTIFY_REDIRECT_URI)
+            .appendQueryParameter("redirect_uri", ApiCredentials.SPOTIFY_REDIRECT_URI)
             .appendQueryParameter("scope", "user-read-private user-read-email user-library-read")
             .build()
             .toString()
