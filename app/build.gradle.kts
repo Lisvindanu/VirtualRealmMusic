@@ -18,14 +18,15 @@ fun getProperty(key: String, defaultValue: String): String {
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
     id("kotlin-parcelize")
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "com.virtualrealm.virtualrealmmusicplayer"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.virtualrealm.virtualrealmmusicplayer"
@@ -43,6 +44,8 @@ android {
 
         // YouTube API key - dari local.properties
         buildConfigField("String", "YOUTUBE_API_KEY", "\"${getProperty("youtube.api.key", "")}\"")
+        manifestPlaceholders.put("redirectSchemeName", "com.virtualrealm.virtualrealmmusicplayer")
+        manifestPlaceholders.put("redirectHostName", "callback")
     }
 
     buildTypes {
@@ -76,69 +79,70 @@ android {
 
 dependencies {
     // Core Android & Kotlin
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
+    implementation(libs.androidx.core.ktx.v1120)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.lifecycle.runtime.ktx.v270)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
 
     // Compose
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation(platform("androidx.compose:compose-bom:2023.10.01"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.compose.runtime:runtime-livedata")
+    implementation(libs.androidx.activity.compose.v182)
+    implementation(platform(libs.androidx.compose.bom.v20231001))
+    implementation(libs.ui)
+    implementation(libs.ui.graphics)
+    implementation(libs.ui.tooling.preview)
+    implementation(libs.material3)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.runtime.livedata)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.androidx.navigation.fragment.ktx)
-    debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation(libs.ui.tooling)
 
     // Compose Navigation
-    implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
 
     // Accompanist (Compose utilities)
-    implementation("com.google.accompanist:accompanist-permissions:0.31.3-beta")
-    implementation("com.google.accompanist:accompanist-systemuicontroller:0.31.3-beta")
-    implementation("com.google.accompanist:accompanist-webview:0.31.3-beta")
+    implementation(libs.accompanist.permissions)
+    implementation(libs.accompanist.systemuicontroller)
+    implementation(libs.accompanist.webview)
 
     // Hilt Dependency Injection
-    implementation("com.google.dagger:hilt-android:2.48")
-    kapt("com.google.dagger:hilt-android-compiler:2.48")
-
-    // Retrofit & OkHttp for API requests
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
-    // Coroutines for asynchronous programming
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-    // Coil for image loading with Compose
-    implementation("io.coil-kt:coil-compose:2.5.0")
-
-    // Spotify SDK
-    implementation("com.spotify.android:auth:2.0.2")
-
-    // YouTube Player API for Compose
-    implementation("com.pierfrancescosoffritti.androidyoutubeplayer:compose-youtube-player:1.0.1")
-
-    // DataStore Preferences
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.android.compiler) // Added Hilt compiler dependency
 
     // Room for local database
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
+
+    // Retrofit & OkHttp for API requests
+    implementation(libs.retrofit)
+    implementation(libs.converter.gson)
+    implementation(libs.okhttp)
+    implementation(libs.logging.interceptor)
+
+    // Coroutines for asynchronous programming
+    implementation(libs.kotlinx.coroutines.android)
+
+    // Coil for image loading with Compose
+    implementation(libs.coil.compose)
+
+    // Spotify SDK
+    implementation(libs.auth)
+
+    // YouTube Player API for Compose
+    implementation(libs.core)
+    implementation(libs.chromecast.sender)
+
+    // DataStore Preferences
+    implementation(libs.androidx.datastore.preferences)
 
     // Testing
-    testImplementation("junit:junit:4.13.2")
-    androidTestImplementation("androidx.test.ext:junit:1.1.5")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
-    androidTestImplementation(platform("androidx.compose:compose-bom:2023.10.01"))
-    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
-    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit.v115)
+    androidTestImplementation(libs.androidx.espresso.core.v351)
+    androidTestImplementation(platform(libs.androidx.compose.bom.v20250500))
+    androidTestImplementation(libs.ui.test.junit4)
+    debugImplementation(libs.ui.test.manifest)
 }

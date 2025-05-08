@@ -27,22 +27,21 @@ class HomeViewModel @Inject constructor(
 ) : ViewModel() {
 
     // Initialize StateFlows in init block
-    val favorites: StateFlow<List<Music>>
+    // Initialize StateFlow in a coroutine-safe way
+    val favorites: StateFlow<List<Music>> = viewModelScope.run {
+        getFavoritesUseCase()
+            .stateIn(
+                scope = this,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
+            )
+    }
     val authState: StateFlow<AuthState?>
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
     init {
-        // Initialize StateFlow in a coroutine-safe way
-        favorites = viewModelScope.run {
-            getFavoritesUseCase()
-                .stateIn(
-                    scope = this,
-                    started = SharingStarted.WhileSubscribed(5000),
-                    initialValue = emptyList()
-                )
-        }
 
         authState = viewModelScope.run {
             getAuthStateUseCase()
