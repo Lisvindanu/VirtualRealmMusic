@@ -1,4 +1,4 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlayerScreen.kt (continued)
+// Update PlayerScreen.kt to fix YouTube player references
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
 import android.view.ViewGroup
@@ -51,8 +51,6 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.google.accompanist.web.WebView
 import com.google.accompanist.web.rememberWebViewState
-import com.pierfrancescosoffritti.androidyoutubeplayer.compose.core.PlayerScope
-import com.pierfrancescosoffritti.androidyoutubeplayer.compose.ui.YouTubePlayerView
 import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.ErrorState
@@ -147,7 +145,7 @@ fun PlayerContent(
         ) {
             when (musicType) {
                 Constants.MUSIC_TYPE_YOUTUBE -> {
-                    YouTubePlayer(videoId = music.id)
+                    SimpleYouTubePlayer(videoId = music.id)
                 }
                 Constants.MUSIC_TYPE_SPOTIFY -> {
                     SpotifyPlayer(trackId = music.id)
@@ -260,19 +258,22 @@ fun PlayerContent(
     }
 }
 
+// Simple replacement for YouTubePlayerView
 @Composable
-fun YouTubePlayer(videoId: String) {
-    val lifecycleOwner = LocalLifecycleOwner.current
+fun SimpleYouTubePlayer(videoId: String) {
+    val webViewState = rememberWebViewState(url = "https://www.youtube.com/embed/$videoId")
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .aspectRatio(16f / 9f)
     ) {
-        YouTubePlayerView(
-            onReady = { player ->
-                player.loadVideo(videoId, 0f)
-            }
+        WebView(
+            state = webViewState,
+            onCreated = { webView ->
+                webView.settings.javaScriptEnabled = true
+            },
+            modifier = Modifier.fillMaxSize()
         )
     }
 }

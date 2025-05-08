@@ -1,4 +1,3 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/search/SearchViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.search
 
 import androidx.lifecycle.ViewModel
@@ -9,7 +8,6 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.auth.GetAuthStateUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.SearchMusicUseCase
 import com.virtualrealm.virtualrealmmusicplayer.domain.usecase.music.ToggleFavoriteUseCase
-import com.virtualrealm.virtualrealmmusicplayer.util.Constants
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted

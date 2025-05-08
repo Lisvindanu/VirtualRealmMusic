@@ -2,7 +2,7 @@
 package com.virtualrealm.virtualrealmmusicplayer.data.repository
 
 import android.net.Uri
-import com.virtualrealm.virtualrealmmusicplayer.BuildConfig
+import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState

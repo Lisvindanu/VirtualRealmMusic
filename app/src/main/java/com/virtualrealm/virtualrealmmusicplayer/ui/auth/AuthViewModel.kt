@@ -1,4 +1,3 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/auth/AuthViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.auth
 
 import androidx.lifecycle.ViewModel
@@ -72,4 +71,3 @@ class AuthViewModel @Inject constructor(
         }
     }
 }
-

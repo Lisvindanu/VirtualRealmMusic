@@ -1,7 +1,8 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/remote/service/AuthAuthenticator.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.remote.service
 
-import com.virtualrealm.virtualrealmmusicplayer.BuildConfig
+
+import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import kotlinx.coroutines.flow.first

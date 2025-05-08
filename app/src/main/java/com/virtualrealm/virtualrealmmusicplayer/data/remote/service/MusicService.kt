@@ -1,7 +1,7 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/remote/service/MusicService.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.remote.service
 
-import com.virtualrealm.virtualrealmmusicplayer.BuildConfig
+import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.YouTubeApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.dto.SpotifySearchResponse

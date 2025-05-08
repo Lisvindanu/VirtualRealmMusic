@@ -1,7 +1,8 @@
-// data/repository/MusicRepositoryImpl.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/repository/MusicRepositoryImpl.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.repository
 
-import com.virtualrealm.virtualrealmmusicplayer.BuildConfig
+
+import com.spotify.sdk.android.auth.BuildConfig
 import com.virtualrealm.virtualrealmmusicplayer.data.local.dao.MusicDao
 import com.virtualrealm.virtualrealmmusicplayer.data.local.entity.MusicEntity
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
@@ -47,7 +48,8 @@ class MusicRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun getFavorites(): Flow<List<Music>> {
+    // Remove suspend keyword here
+    override fun getFavorites(): Flow<List<Music>> {
         return musicDao.getFavorites().map { entities ->
             entities.map { it.toMusic() }
         }
