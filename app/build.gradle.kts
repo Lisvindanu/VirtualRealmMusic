@@ -27,7 +27,9 @@ plugins {
 android {
     namespace = "com.virtualrealm.virtualrealmmusicplayer"
     compileSdk = 35
-
+    ksp {
+        arg("ksp.kotlin.1.9.compatibility", "true")
+    }
     defaultConfig {
         applicationId = "com.virtualrealm.virtualrealmmusicplayer"
         minSdk = 23
