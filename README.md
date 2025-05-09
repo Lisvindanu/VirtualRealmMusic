@@ -67,7 +67,7 @@ The app features a custom audio extraction system that enables playing YouTube v
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/VirtualRealmMusicPlayer.git
+   git clone https://github.com/lisvindanu/VirtualRealmMusicPlayer.git
    ```
 
 2. Create a `local.properties` file in the root project directory and add your API key:
