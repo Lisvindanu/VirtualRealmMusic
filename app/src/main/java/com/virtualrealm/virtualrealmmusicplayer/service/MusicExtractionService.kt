@@ -1,5 +1,4 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/service/MusicExtractionService.kt
-
 package com.virtualrealm.virtualrealmmusicplayer.service
 
 import android.util.Log
@@ -18,18 +17,18 @@ class MusicExtractionService @Inject constructor() {
 
             when (music) {
                 is Music.SpotifyTrack -> {
-                    // Untuk Spotify, kita masih menggunakan URL dummy
-                    "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
+                    // For Spotify, return the Spotify URI to be used by SpotifyPlayerManager
+                    "spotify://${music.uri}"
                 }
                 is Music.YoutubeVideo -> {
-                    // Return URL untuk digunakan oleh WebView, bukan MediaPlayer
+                    // Return URL for WebView, not MediaPlayer
                     val videoId = music.id
                     "youtube://$videoId"
                 }
             }
         } catch (e: Exception) {
             Log.e("MusicExtractionService", "Error extracting audio: ${e.message}", e)
-            // Fallback ke URL test jika gagal
+            // Fallback to test URL if failed
             "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
         }
     }
@@ -38,11 +37,12 @@ class MusicExtractionService @Inject constructor() {
         try {
             when (music) {
                 is Music.SpotifyTrack -> {
+                    // Try to get better album art for Spotify tracks
                     music.thumbnailUrl.takeIf { it.isNotEmpty() }
                         ?: "https://via.placeholder.com/400x400?text=Spotify"
                 }
                 is Music.YoutubeVideo -> {
-                    // Gunakan thumbnail YouTube berkualitas tinggi
+                    // Use high quality YouTube thumbnail
                     val videoId = music.id
                     "https://img.youtube.com/vi/$videoId/hqdefault.jpg"
                 }

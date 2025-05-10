@@ -107,7 +107,7 @@ dependencies {
 
     // Animated Bottom Navigation Bar
     implementation("com.exyte:animated-navigation-bar:1.0.0")
-    implementation(libs.spotify.player) // Add this
+//    implementation(libs.spotify.player) // Add this
     // Accompanist (Compose utilities)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.systemuicontroller)
@@ -160,4 +160,8 @@ dependencies {
     androidTestImplementation(platform(libs.androidx.compose.bom.v20250500))
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.test.manifest)
+
+    // spotify aar
+    implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))
+//    implementation(files("libs/spotify-auth-release-2.1.0.aar"))
 }

@@ -5,6 +5,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -52,6 +53,9 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     @Inject
     lateinit var youTubeAudioPlayer: YouTubeAudioPlayer
+
+    @Inject
+    lateinit var spotifyPlayerManager: SpotifyPlayerManager
 
     private val binder = MusicBinder()
     private var mediaPlayer: MediaPlayer? = null
@@ -237,78 +241,120 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
-    fun playMusic(music: Music) {
+     fun playMusic(music: Music) {
         lifecycleScope.launch {
             try {
-                Log.d("MusicService", "Starting to play music: ${music.title}")
+                Log.d(TAG, "Starting to play music: ${music.title}")
                 _playbackState.value = PlaybackState.PREPARING
                 currentMusic = music
                 _currentTrack.value = music
 
                 // Extract URL audio
                 val audioUrl = musicExtractionService.extractAudioUrl(music)
-                Log.d("MusicService", "Using audio URL: $audioUrl")
+                Log.d(TAG, "Using audio URL: $audioUrl")
 
-                // Cek apakah ini URL YouTube
-                if (audioUrl.startsWith("youtube://")) {
-                    // Gunakan YouTubeAudioPlayer
-                    val videoId = audioUrl.substringAfter("youtube://")
+                when {
+                    // Handle Spotify track
+                    audioUrl.startsWith("spotify://") -> {
+                        val spotifyUri = audioUrl.substringAfter("spotify://")
 
-                    // Set callbacks
-                    youTubeAudioPlayer.onPrepared = {
-                        _playbackState.value = PlaybackState.PLAYING
-                        updatePlaybackState(PlaybackState.PLAYING)
-
-                        // Jalankan di foreground dengan notifikasi
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-                        } else {
-                            startForeground(NOTIFICATION_ID, createNotification())
-                        }
-                    }
-
-                    youTubeAudioPlayer.onCompletion = {
-                        skipToNext()
-                    }
-
-                    youTubeAudioPlayer.onError = { message ->
-                        Log.e("MusicService", "YouTube player error: $message")
-                        _playbackState.value = PlaybackState.ERROR
-                    }
-
-                    // Load dan putar YouTube
-                    youTubeAudioPlayer.loadAndPlayYouTube(videoId)
-
-                } else {
-                    // Gunakan MediaPlayer biasa untuk non-YouTube
-                    withContext(Dispatchers.Main) {
-                        try {
-                            mediaPlayer?.reset()
-                            Log.d("MusicService", "MediaPlayer reset successful")
-                        } catch (e: Exception) {
-                            Log.e("MusicService", "Error resetting MediaPlayer: ${e.message}", e)
-                        }
-                    }
-
-                    withContext(Dispatchers.IO) {
-                        try {
-                            mediaPlayer?.setDataSource(audioUrl)
-                            Log.d("MusicService", "Set data source success")
-                            mediaPlayer?.prepareAsync()
-                            Log.d("MusicService", "Preparing media player asynchronously")
-                        } catch (e: Exception) {
-                            Log.e("MusicService", "Error preparing media player: ${e.message}", e)
+                        // Cek apakah Spotify terpasang
+                        if (!spotifyPlayerManager.isSpotifyInstalled()) {
+                            Log.e(TAG, "Spotify app not installed")
                             _playbackState.value = PlaybackState.ERROR
+                            return@launch
+                        }
+
+                        // Connect ke Spotify
+                        if (!spotifyPlayerManager.isConnected.value) {
+                            spotifyPlayerManager.connect(
+                                onConnected = {
+                                    // Play track ketika sudah terhubung
+                                    spotifyPlayerManager.playTrack(spotifyUri)
+                                    _playbackState.value = PlaybackState.PLAYING
+                                    updatePlaybackState(PlaybackState.PLAYING)
+
+                                    // Update UI/notification
+                                    updateMediaSessionMetadata(music)
+                                    updateNotification()
+                                },
+                                onFailure = { error ->
+                                    Log.e(TAG, "Spotify connection error: $error")
+                                    _playbackState.value = PlaybackState.ERROR
+                                }
+                            )
+                        } else {
+                            // Jika sudah terhubung, langsung play
+                            spotifyPlayerManager.playTrack(spotifyUri)
+                            _playbackState.value = PlaybackState.PLAYING
+                            updatePlaybackState(PlaybackState.PLAYING)
+
+                            // Update UI/notification
+                            updateMediaSessionMetadata(music)
+                            updateNotification()
+                        }
+                    }
+
+                    // Handle YouTube video
+                    audioUrl.startsWith("youtube://") -> {
+                        val videoId = audioUrl.substringAfter("youtube://")
+
+                        // Set callbacks
+                        youTubeAudioPlayer.onPrepared = {
+                            _playbackState.value = PlaybackState.PLAYING
+                            updatePlaybackState(PlaybackState.PLAYING)
+
+                            // Start foreground service
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                            } else {
+                                startForeground(NOTIFICATION_ID, createNotification())
+                            }
+                        }
+
+                        youTubeAudioPlayer.onCompletion = {
+                            skipToNext()
+                        }
+
+                        youTubeAudioPlayer.onError = { message ->
+                            Log.e(TAG, "YouTube player error: $message")
+                            _playbackState.value = PlaybackState.ERROR
+                        }
+
+                        // Load dan putar YouTube
+                        youTubeAudioPlayer.loadAndPlayYouTube(videoId)
+                    }
+
+                    // Handle regular media files
+                    else -> {
+                        withContext(Dispatchers.Main) {
+                            try {
+                                mediaPlayer?.reset()
+                                Log.d(TAG, "MediaPlayer reset successful")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error resetting MediaPlayer: ${e.message}", e)
+                            }
+                        }
+
+                        withContext(Dispatchers.IO) {
+                            try {
+                                mediaPlayer?.setDataSource(audioUrl)
+                                Log.d(TAG, "Set data source success")
+                                mediaPlayer?.prepareAsync()
+                                Log.d(TAG, "Preparing media player asynchronously")
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error preparing media player: ${e.message}", e)
+                                _playbackState.value = PlaybackState.ERROR
+                            }
                         }
                     }
                 }
 
-                // Update UI elements
+                // Load album art
                 loadAlbumArt(music.thumbnailUrl)
-                updateMediaSessionMetadata(music)
 
             } catch (e: Exception) {
-                Log.e("MusicService", "Error in playMusic: ${e.message}", e)
+                Log.e(TAG, "Error in playMusic: ${e.message}", e)
                 _playbackState.value = PlaybackState.ERROR
             }
         }
@@ -408,44 +454,71 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     }
 
     fun play() {
-        if (currentMusic is Music.YoutubeVideo &&
-            _currentTrack.value?.id?.startsWith("youtube://") == true) {
-            youTubeAudioPlayer.play()
-            _playbackState.value = PlaybackState.PLAYING
-            updatePlaybackState(PlaybackState.PLAYING)
+        when {
+            // Untuk Spotify
+            currentMusic is Music.SpotifyTrack -> {
+                spotifyPlayerManager.resume()
+                _playbackState.value = PlaybackState.PLAYING
+                updatePlaybackState(PlaybackState.PLAYING)
 
-            // Use the appropriate overload based on API level
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-            } else {
-                startForeground(NOTIFICATION_ID, createNotification())
+                // Update notification
+                updateNotification()
             }
-        } else if (_playbackState.value == PlaybackState.PAUSED) {
-            mediaPlayer?.start()
-            _playbackState.value = PlaybackState.PLAYING
-            updatePlaybackState(PlaybackState.PLAYING)
 
-            // Use the appropriate overload based on API level
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
-            } else {
-                startForeground(NOTIFICATION_ID, createNotification())
+            // Bagian kode lainnya untuk YouTube dan MediaPlayer tetap sama
+            currentMusic is Music.YoutubeVideo &&
+                    _currentTrack.value?.id?.startsWith("youtube://") == true -> {
+                youTubeAudioPlayer.play()
+                _playbackState.value = PlaybackState.PLAYING
+                updatePlaybackState(PlaybackState.PLAYING)
+
+                // Use the appropriate overload based on API level
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                } else {
+                    startForeground(NOTIFICATION_ID, createNotification())
+                }
+            }
+            _playbackState.value == PlaybackState.PAUSED -> {
+                mediaPlayer?.start()
+                _playbackState.value = PlaybackState.PLAYING
+                updatePlaybackState(PlaybackState.PLAYING)
+
+                // Use the appropriate overload based on API level
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                } else {
+                    startForeground(NOTIFICATION_ID, createNotification())
+                }
             }
         }
     }
 
+    // Perbarui metode pause() untuk menangani Spotify
     fun pause() {
-        if (currentMusic is Music.YoutubeVideo &&
-            _currentTrack.value?.id?.startsWith("youtube://") == true) {
-            youTubeAudioPlayer.pause()
-            _playbackState.value = PlaybackState.PAUSED
-            updatePlaybackState(PlaybackState.PAUSED)
-            updateNotification()
-        } else if (_playbackState.value == PlaybackState.PLAYING) {
-            mediaPlayer?.pause()
-            _playbackState.value = PlaybackState.PAUSED
-            updatePlaybackState(PlaybackState.PAUSED)
-            updateNotification()
+        when {
+            // Untuk Spotify
+            currentMusic is Music.SpotifyTrack -> {
+                spotifyPlayerManager.pause()
+                _playbackState.value = PlaybackState.PAUSED
+                updatePlaybackState(PlaybackState.PAUSED)
+                updateNotification()
+            }
+
+            // Bagian kode lainnya untuk YouTube dan MediaPlayer tetap sama
+            currentMusic is Music.YoutubeVideo &&
+                    _currentTrack.value?.id?.startsWith("youtube://") == true -> {
+                youTubeAudioPlayer.pause()
+                _playbackState.value = PlaybackState.PAUSED
+                updatePlaybackState(PlaybackState.PAUSED)
+                updateNotification()
+            }
+            _playbackState.value == PlaybackState.PLAYING -> {
+                mediaPlayer?.pause()
+                _playbackState.value = PlaybackState.PAUSED
+                updatePlaybackState(PlaybackState.PAUSED)
+                updateNotification()
+            }
         }
     }
 
@@ -684,6 +757,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     override fun onDestroy() {
         serviceScope.cancel()
+        spotifyPlayerManager.disconnect() // Pastikan memanggil ini
         youTubeAudioPlayer.release()
         mediaPlayer?.release()
         mediaPlayer = null
@@ -705,6 +779,13 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     // Mendapatkan posisi pemutaran saat ini (dalam ms)
     fun getCurrentPosition(): Long {
         return when {
+            // Untuk Spotify
+            currentMusic is Music.SpotifyTrack && spotifyPlayerManager.isConnected.value -> {
+                val position = spotifyPlayerManager.getCurrentPosition()
+                Log.d("MusicService", "Spotify current position: $position ms")
+                position
+            }
+
             // Jika YouTube player aktif
             (currentMusic is Music.YoutubeVideo &&
                     youTubeAudioPlayer.isPlaying.value) -> {
@@ -731,6 +812,14 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     // Mendapatkan durasi total (dalam ms)
     fun getDuration(): Long {
         return when {
+            currentMusic is Music.SpotifyTrack && spotifyPlayerManager.isConnected.value -> {
+                val duration = spotifyPlayerManager.getDuration()
+                if (duration > 0) {
+                    duration
+                } else {
+                    (currentMusic as Music.SpotifyTrack).durationMs
+                }
+            }
             // Jika YouTube player aktif
             (currentMusic is Music.YoutubeVideo) -> {
                 val duration = youTubeAudioPlayer.duration.value
@@ -777,6 +866,10 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         Log.d("MusicService", "Seeking to position: $position ms")
 
         when {
+            // Untuk Spotify
+            currentMusic is Music.SpotifyTrack && spotifyPlayerManager.isConnected.value -> {
+                spotifyPlayerManager.seekTo(position)
+            }
             // Jika YouTube player aktif
             (currentMusic is Music.YoutubeVideo &&
                     youTubeAudioPlayer.isPlaying.value) -> {
