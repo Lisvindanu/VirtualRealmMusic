@@ -3,6 +3,7 @@ package com.virtualrealm.virtualrealmmusicplayer.data.remote.service
 
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
+import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyAuthApi
 import com.virtualrealm.virtualrealmmusicplayer.util.ApiCredentials
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -16,7 +17,7 @@ import javax.inject.Singleton
 
 @Singleton
 class AuthAuthenticator @Inject constructor(
-    private val spotifyApiProvider: Provider<SpotifyApi>, // Change to Provider
+    private val spotifyAuthApiProvider: Provider<SpotifyAuthApi>, // Change to Provider
     private val authPreferences: AuthPreferences
 ) : Authenticator {
 
@@ -40,9 +41,9 @@ class AuthAuthenticator @Inject constructor(
 
             try {
                 // Get the SpotifyApi from the provider when needed
-                val spotifyApi = spotifyApiProvider.get()
+                val spotifyAuthApi = spotifyAuthApiProvider.get()
 
-                val tokenResponse = spotifyApi.refreshToken(
+                val tokenResponse = spotifyAuthApi.refreshToken( // Use spotifyAuthApi
                     refreshToken = authState.refreshToken,
                     clientId = ApiCredentials.SPOTIFY_CLIENT_ID,
                     clientSecret = ApiCredentials.SPOTIFY_CLIENT_SECRET

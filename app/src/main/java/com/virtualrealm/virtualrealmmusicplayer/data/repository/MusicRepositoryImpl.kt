@@ -41,7 +41,14 @@ class MusicRepositoryImpl @Inject constructor(
                 return@flow
             }
 
-            val response = spotifyApi.search(query, authorization = "Bearer $accessToken")
+            // Make sure we're using the proper authorization format
+            val authHeader = "Bearer $accessToken"
+            Log.d("MusicRepository", "Using auth header: $authHeader (length: ${authHeader.length})")
+
+            val response = spotifyApi.search(
+                query = query,
+                authorization = authHeader
+            )
             val tracks = response.tracks.items.map { it.toSpotifyTrack() }
 
             Log.d("MusicRepository", "Found ${tracks.size} Spotify tracks")

@@ -3,6 +3,7 @@ package com.virtualrealm.virtualrealmmusicplayer.di
 
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
+import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyAuthApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.YouTubeApi
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.service.AuthAuthenticator
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.service.TokenInterceptor
@@ -41,10 +42,10 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideAuthAuthenticator(
-        spotifyApiProvider: Provider<SpotifyApi>, // Use Provider instead of direct injection
+        spotifyAuthApiProvider: Provider<SpotifyAuthApi>, // Changed to SpotifyAuthApi
         authPreferences: AuthPreferences
     ): AuthAuthenticator {
-        return AuthAuthenticator(spotifyApiProvider, authPreferences)
+        return AuthAuthenticator(spotifyAuthApiProvider, authPreferences)
     }
 
     @Provides
@@ -120,9 +121,8 @@ object NetworkModule {
         @Named("spotifyAuthRetrofit") spotifyAuthRetrofit: Retrofit,
         @Named("spotifyApiRetrofit") spotifyApiRetrofit: Retrofit
     ): SpotifyApi {
-        // For simplicity, we're using the auth retrofit for both auth and API
-        // In a real-world app, you might want to create separate API interfaces
-        return spotifyAuthRetrofit.create(SpotifyApi::class.java)
+        // Fix: use spotifyApiRetrofit instead of spotifyAuthRetrofit
+        return spotifyApiRetrofit.create(SpotifyApi::class.java)
     }
 
     @Provides
@@ -131,5 +131,13 @@ object NetworkModule {
         @Named("youtubeRetrofit") youtubeRetrofit: Retrofit
     ): YouTubeApi {
         return youtubeRetrofit.create(YouTubeApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSpotifyAuthApi(
+        @Named("spotifyAuthRetrofit") spotifyAuthRetrofit: Retrofit
+    ): SpotifyAuthApi {
+        return spotifyAuthRetrofit.create(SpotifyAuthApi::class.java)
     }
 }

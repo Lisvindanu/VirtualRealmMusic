@@ -94,10 +94,11 @@ class SpotifyAuthHandler @Inject constructor(
             val encodedAuth = Base64.encodeToString(authString.toByteArray(), Base64.NO_WRAP)
 
             // Buat form body
+            // In the formBody creation, try using URL encoding for the redirect URI
             val formBody = FormBody.Builder()
                 .add("grant_type", "authorization_code")
-                .add("code", code.trim()) // Trim untuk menghilangkan spasi yang mungkin ada
-                .add("redirect_uri", ApiCredentials.SPOTIFY_REDIRECT_URI)
+                .add("code", code.trim())
+                .add("redirect_uri", java.net.URLEncoder.encode(ApiCredentials.SPOTIFY_REDIRECT_URI, "UTF-8"))
                 .build()
 
             // Buat request

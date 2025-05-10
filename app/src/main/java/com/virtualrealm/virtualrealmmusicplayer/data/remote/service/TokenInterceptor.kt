@@ -31,6 +31,12 @@ class TokenInterceptor @Inject constructor(
             return chain.proceed(originalRequest)
         }
 
+        // Check if the request already has an Authorization header
+        if (originalRequest.header("Authorization") != null) {
+            // If it already has one, use it as is
+            return chain.proceed(originalRequest)
+        }
+
         val authenticatedRequest = originalRequest.newBuilder()
             .header("Authorization", "${authState.tokenType ?: "Bearer"} ${authState.accessToken}")
             .build()

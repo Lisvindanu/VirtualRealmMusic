@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import com.virtualrealm.virtualrealmmusicplayer.data.auth.SpotifyAuthHandler
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
-import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
+import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyAuthApi
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
 import com.virtualrealm.virtualrealmmusicplayer.domain.repository.AuthRepository
@@ -19,7 +19,7 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val authPreferences: AuthPreferences,
-    private val spotifyApi: SpotifyApi,
+    private val spotifyAuthApi: SpotifyAuthApi,
     private val spotifyAuthHandler: SpotifyAuthHandler
 ) : AuthRepository {
 
@@ -57,14 +57,13 @@ class AuthRepositoryImpl @Inject constructor(
     override suspend fun exchangeSpotifyCode(code: String): Flow<Resource<AuthState>> = flow {
         emit(Resource.Loading)
         try {
-            val response = spotifyApi.getToken(
+            val response = spotifyAuthApi.getToken(
                 grantType = "authorization_code",
                 code = code,
                 redirectUri = ApiCredentials.SPOTIFY_REDIRECT_URI,
                 clientId = ApiCredentials.SPOTIFY_CLIENT_ID,
                 clientSecret = ApiCredentials.SPOTIFY_CLIENT_SECRET
             )
-
             val authState = AuthState(
                 isAuthenticated = true,
                 accessToken = response.accessToken,
