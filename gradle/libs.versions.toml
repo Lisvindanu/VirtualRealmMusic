@@ -42,6 +42,7 @@ roomCompiler = "2.7.1"
 roomKtx = "2.7.1"
 roomRuntime = "2.7.1"
 lifecycleService = "2.9.0"
+spotifyPlayer = "1.0.0-beta04"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
@@ -111,6 +112,7 @@ logging-interceptor = { module = "com.squareup.okhttp3:logging-interceptor", ver
 material3 = { module = "androidx.compose.material3:material3" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
 retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+spotify-player = { module = "com.spotify.android:spotify-player", version.ref = "spotifyPlayer" }
 ui = { module = "androidx.compose.ui:ui" }
 ui-graphics = { module = "androidx.compose.ui:ui-graphics" }
 ui-test-junit4 = { module = "androidx.compose.ui:ui-test-junit4" }

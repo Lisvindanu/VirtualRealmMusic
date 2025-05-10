@@ -107,7 +107,7 @@ dependencies {
 
     // Animated Bottom Navigation Bar
     implementation("com.exyte:animated-navigation-bar:1.0.0")
-
+    implementation(libs.spotify.player) // Add this
     // Accompanist (Compose utilities)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.systemuicontroller)

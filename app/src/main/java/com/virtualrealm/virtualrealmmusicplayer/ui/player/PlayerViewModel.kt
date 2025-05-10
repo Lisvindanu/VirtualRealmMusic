@@ -34,10 +34,7 @@ class PlayerViewModel @Inject constructor(
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
 
-    // Update the loadMusic function in PlayerViewModel.kt
-    // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlayerViewModel.kt
 
-    // Di dalam method loadMusic
     fun loadMusic(musicId: String, musicType: String) {
         viewModelScope.launch {
             _isLoading.value = true
