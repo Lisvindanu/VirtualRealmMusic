@@ -66,11 +66,17 @@ fun HomeScreen(
                 }
             )
         },
+        // Button Mengambang
         floatingActionButton = {
-            FloatingActionButton(onClick = onNavigateToSearch) {
+            FloatingActionButton(
+                onClick = onNavigateToSearch,
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            ) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.search))
             }
         }
+
     ) { innerPadding ->
         Box(
             modifier = Modifier
