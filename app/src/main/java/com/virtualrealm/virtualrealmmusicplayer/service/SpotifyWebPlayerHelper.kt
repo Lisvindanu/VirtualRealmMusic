@@ -15,17 +15,27 @@ import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
 class SpotifyWebPlayerHelper @Inject constructor(
-    private val context: Context
+    private val context: Context,
+    private val authPreferences: AuthPreferences // Inject AuthPreferences
 ) {
     private var webView: WebView? = null
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    // Create coroutine scope for this helper
+    private val coroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     // StateFlow untuk status player
     private val _isPlaying = MutableStateFlow(false)
@@ -239,32 +249,71 @@ class SpotifyWebPlayerHelper @Inject constructor(
     fun loadAndPlayTrack(trackId: String) {
         _isLoading.value = true
 
-        // Menggunakan Spotify Embedded Player
-        // val spotifyEmbedUrl = "https://open.spotify.com/embed/track/$trackId"
+        coroutineScope.launch {
+            try {
+                val authState = authPreferences.authStateFlow.first()
+                val token = authState.accessToken
 
-        // Atau menggunakan URL langsung ke Spotify Web Player (memerlukan login)
-        val spotifyWebUrl = "https://open.spotify.com/track/$trackId"
+                if (token != null) {
+                    Log.d("SpotifyWeb", "Using token for track: $trackId")
 
-        Log.d("SpotifyWeb", "Loading track: $trackId, URL: $spotifyWebUrl")
+                    // Create a cookie to pre-authenticate the WebView
+                    val cookieManager = android.webkit.CookieManager.getInstance()
+                    cookieManager.setAcceptCookie(true)
+                    cookieManager.setCookie("open.spotify.com", "sp_t=$token")
+                    cookieManager.flush()
 
-        mainHandler.post {
-            webView?.loadUrl(spotifyWebUrl)
+                    // Make sure we're loading a secure URL for DRM
+                    val spotifyWebUrl = "https://open.spotify.com/track/$trackId"
 
-            // Set timeout untuk kasus loading terlalu lama
-            mainHandler.postDelayed({
-                if (_isLoading.value) {
-                    Log.w("SpotifyWeb", "Loading timeout reached")
+                    // Configure WebView for better media support
+                    webView?.settings?.apply {
+                        javaScriptEnabled = true
+                        domStorageEnabled = true
+                        mediaPlaybackRequiresUserGesture = false
+                        // These settings might help with DRM support
+                        allowContentAccess = true
+                        allowFileAccess = true
+                    }
+
+                    // Load the actual Spotify web page
+                    webView?.loadUrl(spotifyWebUrl)
+
+                    // Inject control script after delay
+                    mainHandler.postDelayed({
+                        injectControlScripts()
+                    }, 3000)
+                } else {
+                    onError?.invoke("Spotify login required")
                     _isLoading.value = false
-                    onError?.invoke("Loading timed out")
                 }
-            }, 15000) // 15 detik timeout
+            } catch (e: Exception) {
+                Log.e("SpotifyWeb", "Error loading track: ${e.message}", e)
+                onError?.invoke("Error loading track: ${e.message}")
+                _isLoading.value = false
+            }
         }
+    }
+
+    // New function to get a direct stream URL
+    private suspend fun getSpotifyDirectStreamUrl(trackId: String, token: String): String? {
+        // This approach would need a custom implementation potentially using:
+        // 1. A proxy service that converts Spotify URLs to direct MP3s
+        // 2. A service like Deezer's API which might have the same song
+        // 3. A custom server implementation that handles Spotify's DRM
+
+        // For now, return null to indicate we couldn't get a direct URL
+        return null
     }
 
     fun play() {
         mainHandler.post {
             val playScript = """
-                if (window.spotifyMediaElement) {
+                if (window.spotifyPlayer) {
+                    spotifyPlayer.resume().then(() => {
+                        console.log('Resumed playback');
+                    });
+                } else if (window.spotifyMediaElement) {
                     window.spotifyMediaElement.play();
                 } else {
                     // Coba klik tombol play
@@ -279,7 +328,11 @@ class SpotifyWebPlayerHelper @Inject constructor(
     fun pause() {
         mainHandler.post {
             val pauseScript = """
-                if (window.spotifyMediaElement) {
+                if (window.spotifyPlayer) {
+                    spotifyPlayer.pause().then(() => {
+                        console.log('Paused playback');
+                    });
+                } else if (window.spotifyMediaElement) {
                     window.spotifyMediaElement.pause();
                 } else {
                     // Coba klik tombol pause
@@ -294,7 +347,11 @@ class SpotifyWebPlayerHelper @Inject constructor(
     fun seekTo(positionMs: Long) {
         mainHandler.post {
             val seekScript = """
-                if (window.spotifyMediaElement) {
+                if (window.spotifyPlayer) {
+                    spotifyPlayer.seek(${positionMs}).then(() => {
+                        console.log('Seeked to position: ${positionMs}ms');
+                    });
+                } else if (window.spotifyMediaElement) {
                     window.spotifyMediaElement.currentTime = ${positionMs / 1000.0};
                 }
             """
@@ -304,6 +361,13 @@ class SpotifyWebPlayerHelper @Inject constructor(
 
     fun release() {
         mainHandler.post {
+            val disconnectScript = """
+                if (window.spotifyPlayer) {
+                    spotifyPlayer.disconnect();
+                }
+            """
+            webView?.evaluateJavascript(disconnectScript, null)
+
             webView?.clearHistory()
             webView?.clearCache(true)
             webView?.loadUrl("about:blank")
