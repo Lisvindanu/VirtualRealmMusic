@@ -108,42 +108,140 @@ app/
 │   │   │   ├── data/                   # Data layer
 │   │   │   │   ├── local/              # Local storage
 │   │   │   │   │   ├── cache/          # Local cache management
+│   │   │   │   │   │   └── LocalCacheManager.kt
 │   │   │   │   │   ├── dao/            # Data Access Objects
+│   │   │   │   │   │   └── MusicDao.kt
 │   │   │   │   │   ├── database/       # Room database setup
+│   │   │   │   │   │   └── MusicDatabase.kt
 │   │   │   │   │   ├── entity/         # Database entities
+│   │   │   │   │   │   └── MusicEntity.kt
 │   │   │   │   │   └── preferences/    # DataStore preferences
+│   │   │   │   │       └── AuthPreferences.kt
 │   │   │   │   ├── remote/             # Remote data sources
 │   │   │   │   │   ├── api/            # API interfaces
+│   │   │   │   │   │   ├── SpotifyApi.kt
+│   │   │   │   │   │   └── YouTubeApi.kt
 │   │   │   │   │   ├── dto/            # Data Transfer Objects
+│   │   │   │   │   │   ├── SpotifyDto.kt
+│   │   │   │   │   │   ├── YouTubeDto.kt
+│   │   │   │   │   │   └── YouTubeVideoDetailsDto.kt
 │   │   │   │   │   └── service/        # Network services
+│   │   │   │   │       ├── AuthAuthenticator.kt
+│   │   │   │   │       ├── MusicService.kt
+│   │   │   │   │       ├── NetworkBoundResource.kt
+│   │   │   │   │       └── TokenInterceptor.kt
 │   │   │   │   ├── repository/         # Repository implementations
+│   │   │   │   │   ├── AuthRepositoryImpl.kt
+│   │   │   │   │   └── MusicRepositoryImpl.kt
 │   │   │   │   └── util/               # Data utilities
+│   │   │   │       ├── ApiResponseHandler.kt
+│   │   │   │       └── NetworkConnectivityHelper.kt
 │   │   │   ├── di/                     # Dependency injection modules
+│   │   │   │   ├── AppModule.kt
+│   │   │   │   ├── DatabaseModule.kt
+│   │   │   │   ├── NetworkModule.kt
+│   │   │   │   └── RepositoryModule.kt
 │   │   │   ├── domain/                 # Domain layer
 │   │   │   │   ├── model/              # Domain models
+│   │   │   │   │   ├── AuthState.kt
+│   │   │   │   │   ├── Music.kt
+│   │   │   │   │   └── Resource.kt
 │   │   │   │   ├── repository/         # Repository interfaces
+│   │   │   │   │   ├── AuthRepository.kt
+│   │   │   │   │   └── MusicRepository.kt
 │   │   │   │   └── usecase/            # Use cases
 │   │   │   │       ├── auth/           # Authentication use cases
+│   │   │   │       │   ├── ExchangeSpotifyCodeUseCase.kt
+│   │   │   │       │   ├── GetAuthStateUseCase.kt
+│   │   │   │       │   ├── LogoutUseCase.kt
+│   │   │   │       │   └── RefreshSpotifyTokenUseCase.kt
 │   │   │   │       └── music/          # Music-related use cases
+│   │   │   │           ├── GetFavoritesUseCase.kt
+│   │   │   │           ├── SearchMusicUseCase.kt
+│   │   │   │           └── ToggleFavoriteUseCase.kt
 │   │   │   ├── service/                # Background services
-│   │   │   │   ├── MusicService        # Music playback service
-│   │   │   │   ├── MusicExtractionService # Audio extraction service
-│   │   │   │   └── YouTubeAudioPlayer  # YouTube-specific functionality
+│   │   │   │   ├── MusicExtractionService.kt
+│   │   │   │   ├── MusicService.kt
+│   │   │   │   ├── YoutubeAudioHelper.kt
+│   │   │   │   └── YouTubeAudioPlayer.kt
 │   │   │   ├── ui/                     # UI layer (Jetpack Compose)
 │   │   │   │   ├── auth/               # Authentication screens
+│   │   │   │   │   ├── AuthViewModel.kt
+│   │   │   │   │   ├── LoginScreen.kt
+│   │   │   │   │   └── SpotifyAuthActivity.kt
 │   │   │   │   ├── common/             # Common UI components
+│   │   │   │   │   ├── EmptyState.kt
+│   │   │   │   │   ├── ErrorState.kt
+│   │   │   │   │   ├── LoadingState.kt
+│   │   │   │   │   ├── MusicItem.kt
+│   │   │   │   │   └── SourceTag.kt
 │   │   │   │   ├── home/               # Home screen
+│   │   │   │   │   ├── HomeScreen.kt
+│   │   │   │   │   └── HomeViewModel.kt
 │   │   │   │   ├── main/               # Main screen and navigation
+│   │   │   │   │   ├── BottomNavItem.kt
+│   │   │   │   │   ├── MainViewModel.kt
+│   │   │   │   │   ├── MusicAppNavHost.kt
+│   │   │   │   │   └── Screen.kt
 │   │   │   │   ├── player/             # Player screen
+│   │   │   │   │   ├── MusicViewModel.kt
+│   │   │   │   │   ├── PlayerScreen.kt
+│   │   │   │   │   └── PlayerViewModel.kt
 │   │   │   │   ├── playlist/           # Playlist screen
+│   │   │   │   │   └── PlaylistScreen.kt
 │   │   │   │   ├── search/             # Search screen
+│   │   │   │   │   ├── SearchScreen.kt
+│   │   │   │   │   └── SearchViewModel.kt
 │   │   │   │   └── theme/              # Theme definitions
+│   │   │   │       ├── Color.kt
+│   │   │   │       ├── Theme.kt
+│   │   │   │       └── Type.kt
 │   │   │   └── util/                   # Utility classes
+│   │   │       ├── ApiCredentials.kt
+│   │   │       ├── AppConfig.kt
+│   │   │       ├── Constants.kt
+│   │   │       ├── DateTimeUtils.kt
+│   │   │       ├── Extensions.kt
+│   │   │       └── ResourceState.kt
 │   │   └── res/                        # Resources
+│   │       ├── drawable/
+│   │       │   ├── ic_launcher_background.xml
+│   │       │   ├── ic_launcher_foreground.xml
+│   │       │   ├── ic_music_note.xml
+│   │       │   ├── ic_next.xml
+│   │       │   ├── ic_pause.xml
+│   │       │   ├── ic_play.xml
+│   │       │   ├── ic_previous.xml
+│   │       │   ├── ic_spotify.xml
+│   │       │   ├── ic_youtube.xml
+│   │       │   └── placeholder_album.xml
+│   │       ├── values/
+│   │       │   ├── colors.xml
+│   │       │   ├── strings.xml
+│   │       │   └── themes.xml
+│   │       ├── xml/
+│   │       │   ├── backup_rules.xml
+│   │       │   └── data_extraction_rules.xml
+│   │       └── mipmap-anydpi-v26/
+│   │           ├── ic_launcher.xml
+│   │           └── ic_launcher_round.xml
 │   └── test/                           # Unit tests
+│       ├── java/com/virtualrealm/virtualrealmmusicplayer/
+│       │   └── ExampleUnitTest.kt
+│       └── androidTest/java/com/virtualrealm/virtualrealmmusicplayer/
+│           └── ExampleInstrumentedTest.kt
 ├── build.gradle.kts                    # App build configuration
 ├── proguard-rules.pro                  # ProGuard rules
-└── .gitignore                          # App-level gitignore
+├── .gitignore                          # App-level gitignore
+├── AndroidManifest.xml                 # Android manifest file
+├── README.md                           # Project documentation
+├── gradle.properties                   # Gradle properties
+├── settings.gradle.kts                 # Gradle settings
+├── gradle/
+│   └── wrapper/
+│       └── gradle-wrapper.properties
+├── gradlew                             # Gradle wrapper script
+└── gradlew.bat                         # Gradle wrapper script for Windows
 ```
 ```
 
