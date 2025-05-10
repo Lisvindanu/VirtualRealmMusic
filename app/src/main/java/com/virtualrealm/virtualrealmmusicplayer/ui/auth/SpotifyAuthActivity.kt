@@ -1,8 +1,10 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/auth/SpotifyAuthActivity.kt
+
 package com.virtualrealm.virtualrealmmusicplayer.ui.auth
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
@@ -11,7 +13,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -22,28 +23,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.virtualrealm.virtualrealmmusicplayer.MainActivity
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.VirtualRealmMusicPlayerTheme
-import com.virtualrealm.virtualrealmmusicplayer.util.showToast
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class SpotifyAuthActivity : ComponentActivity() {
-
+    private val TAG = "SpotifyAuthActivity"
     private val viewModel: AuthViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Handle the auth callback
-        val uri = intent.data
-        if (uri != null) {
-            val code = uri.getQueryParameter("code")
-            if (code != null) {
-                viewModel.exchangeCodeForToken(code)
-            } else {
-                val error = uri.getQueryParameter("error")
-                showToast("Authentication failed: $error")
-                navigateToMainActivity()
-            }
+        Log.d(TAG, "SpotifyAuthActivity created with intent: ${intent?.data}")
+
+        // Handle authorization response from Spotify
+        if (intent?.action == Intent.ACTION_VIEW) {
+            viewModel.exchangeCodeForToken(intent)
         }
 
         setContent {
@@ -61,43 +55,10 @@ class SpotifyAuthActivity : ComponentActivity() {
     }
 
     private fun navigateToMainActivity() {
-        startActivity(Intent(this, MainActivity::class.java).apply {
+        val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        })
+        }
+        startActivity(intent)
         finish()
-    }
-}
-
-@Composable
-fun SpotifyAuthScreen(
-    onAuthComplete: () -> Unit,
-    viewModel: AuthViewModel = hiltViewModel()
-) {
-    val authResult by viewModel.authResult.collectAsState()
-
-    LaunchedEffect(authResult) {
-        when (authResult) {
-            is Resource.Success -> {
-                onAuthComplete()
-            }
-            is Resource.Error -> {
-                onAuthComplete()
-            }
-            else -> {}
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        CircularProgressIndicator(
-            modifier = Modifier.align(Alignment.Center)
-        )
-
-        if (authResult is Resource.Error) {
-            Text(
-                text = (authResult as Resource.Error).message,
-                modifier = Modifier.align(Alignment.Center),
-                style = MaterialTheme.typography.bodyLarge
-            )
-        }
     }
 }

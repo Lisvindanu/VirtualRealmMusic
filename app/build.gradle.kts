@@ -147,6 +147,11 @@ dependencies {
     // Add to dependencies section in app/build.gradle.kts
     implementation(libs.glide)
     implementation(libs.androidx.media)  // For MediaStyle notifications
+    implementation(libs.appauth)
+    implementation(libs.androidx.browser)
+
+    // For JSON processing
+    implementation(libs.converter.gson)
 
     // Testing
     testImplementation(libs.junit)

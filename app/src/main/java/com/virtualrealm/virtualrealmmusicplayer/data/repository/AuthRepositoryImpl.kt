@@ -1,7 +1,9 @@
 // File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/data/repository/AuthRepositoryImpl.kt
 package com.virtualrealm.virtualrealmmusicplayer.data.repository
 
+import android.content.Intent
 import android.net.Uri
+import com.virtualrealm.virtualrealmmusicplayer.data.auth.SpotifyAuthHandler
 import com.virtualrealm.virtualrealmmusicplayer.data.local.preferences.AuthPreferences
 import com.virtualrealm.virtualrealmmusicplayer.data.remote.api.SpotifyApi
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
@@ -17,7 +19,8 @@ import javax.inject.Singleton
 @Singleton
 class AuthRepositoryImpl @Inject constructor(
     private val authPreferences: AuthPreferences,
-    private val spotifyApi: SpotifyApi
+    private val spotifyApi: SpotifyApi,
+    private val spotifyAuthHandler: SpotifyAuthHandler
 ) : AuthRepository {
 
     override suspend fun getAuthState(): Flow<AuthState> {
@@ -32,34 +35,25 @@ class AuthRepositoryImpl @Inject constructor(
         authPreferences.clearAuthState()
     }
 
-    override suspend fun refreshSpotifyToken(): Flow<Resource<AuthState>> = flow {
-        emit(Resource.Loading)
-        try {
-            val currentState = authPreferences.authStateFlow.first()
-            val refreshToken = currentState.refreshToken
-                ?: return@flow emit(Resource.Error("No refresh token available"))
-
-            val response = spotifyApi.refreshToken(
-                refreshToken = refreshToken,
-                clientId = ApiCredentials.SPOTIFY_CLIENT_ID,
-                clientSecret = ApiCredentials.SPOTIFY_CLIENT_SECRET
-            )
-
-            val newAuthState = AuthState(
-                isAuthenticated = true,
-                accessToken = response.accessToken,
-                refreshToken = response.refreshToken ?: refreshToken,
-                expiresIn = response.expiresIn,
-                tokenType = response.tokenType
-            )
-
-            authPreferences.saveAuthState(newAuthState)
-            emit(Resource.Success(newAuthState))
-        } catch (e: Exception) {
-            emit(Resource.Error("Failed to refresh token: ${e.message}", e))
-        }
+    override fun startSpotifyAuthFlow() {
+        spotifyAuthHandler.launchSpotifyAuth()
     }
 
+    // New method to handle intent-based authorization
+    override suspend fun exchangeSpotifyCode(intent: Intent): Flow<Resource<AuthState>> = flow {
+        emit(Resource.Loading)
+
+        val code = spotifyAuthHandler.extractAuthCode(intent)
+        if (code == null) {
+            emit(Resource.Error("No authorization code found"))
+            return@flow
+        }
+
+        val result = spotifyAuthHandler.exchangeAuthorizationCode(code)
+        emit(result)
+    }
+
+    // Keep original method for backward compatibility
     override suspend fun exchangeSpotifyCode(code: String): Flow<Resource<AuthState>> = flow {
         emit(Resource.Loading)
         try {
@@ -86,6 +80,21 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun refreshSpotifyToken(): Flow<Resource<AuthState>> = flow {
+        emit(Resource.Loading)
+        try {
+            val currentState = authPreferences.authStateFlow.first()
+            val refreshToken = currentState.refreshToken
+                ?: return@flow emit(Resource.Error("No refresh token available"))
+
+            // Use direct refresh with SpotifyAuthHandler
+            val result = spotifyAuthHandler.refreshAccessToken(refreshToken)
+            emit(result)
+        } catch (e: Exception) {
+            emit(Resource.Error("Failed to refresh token: ${e.message}", e))
+        }
+    }
+
     override fun getSpotifyAuthUrl(): String {
         return Uri.Builder()
             .scheme("https")
@@ -94,7 +103,7 @@ class AuthRepositoryImpl @Inject constructor(
             .appendQueryParameter("client_id", ApiCredentials.SPOTIFY_CLIENT_ID)
             .appendQueryParameter("response_type", "code")
             .appendQueryParameter("redirect_uri", ApiCredentials.SPOTIFY_REDIRECT_URI)
-            .appendQueryParameter("scope", "user-read-private user-read-email user-library-read")
+            .appendQueryParameter("scope", "user-read-private user-read-email user-library-read streaming")
             .build()
             .toString()
     }

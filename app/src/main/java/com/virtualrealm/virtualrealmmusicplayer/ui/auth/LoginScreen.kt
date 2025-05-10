@@ -114,11 +114,7 @@ fun LoginScreen(
 
                 // Spotify login button
                 Button(
-                    onClick = {
-                        val authUrl = viewModel.getSpotifyAuthUrl()
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
-                        context.startActivity(intent)
-                    },
+                    onClick = { viewModel.startSpotifyAuth() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),

@@ -4,8 +4,10 @@ activityComposeVersion = "1.10.1"
 agp = "8.8.2"
 androidxComposeBom = "2025.05.00"
 androidxJunit = "1.2.1"
+appauth = "0.11.1"
 appcompat = "1.7.0"
 auth = "2.0.2"
+browser = "1.8.0"
 chromecastSender = "0.30"
 coilCompose = "2.5.0"
 composeBomVersion = "2025.05.00"
@@ -49,6 +51,7 @@ accompanist-webview = { module = "com.google.accompanist:accompanist-webview", v
 androidx-activity-compose-v182 = { module = "androidx.activity:activity-compose", version.ref = "activityComposeVersion" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 #noinspection SimilarGradleDependency
+androidx-browser = { module = "androidx.browser:browser", version.ref = "browser" }
 androidx-compose-bom-v20231001 = { module = "androidx.compose:compose-bom", version.ref = "composeBomVersion" }
 #noinspection SimilarGradleDependency
 androidx-compose-bom-v20250500 = { module = "androidx.compose:compose-bom", version.ref = "androidxComposeBom" }
@@ -73,6 +76,7 @@ androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref =
 androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomKtx" }
 androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
 androidx-runtime-livedata = { module = "androidx.compose.runtime:runtime-livedata" }
+appauth = { module = "net.openid:appauth", version.ref = "appauth" }
 auth = { module = "com.spotify.android:auth", version.ref = "auth" }
 chromecast-sender = { module = "com.pierfrancescosoffritti.androidyoutubeplayer:chromecast-sender", version.ref = "chromecastSender" }
 coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
