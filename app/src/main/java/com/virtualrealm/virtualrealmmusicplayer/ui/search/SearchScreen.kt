@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
@@ -52,6 +53,14 @@ import com.virtualrealm.virtualrealmmusicplayer.ui.common.EmptyState
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.ErrorState
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.MusicItem
 import com.virtualrealm.virtualrealmmusicplayer.util.getMusicType
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.mutableStateMapOf
+import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class)
 @Composable
@@ -83,7 +92,12 @@ fun SearchScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                label = { Text(text = stringResource(R.string.search_hint)) },
+                label = {
+                    Text(
+                        text = stringResource(R.string.search_hint),
+                        fontSize = 12.sp
+                    )
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp),
@@ -113,38 +127,11 @@ fun SearchScreen(
                     .padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    RadioButton(
-                        selected = selectedSource == SearchMusicUseCase.MusicSource.YOUTUBE,
-                        onClick = { viewModel.setMusicSource(SearchMusicUseCase.MusicSource.YOUTUBE) }
-                    )
-                    Text(
-                        text = stringResource(R.string.youtube),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    RadioButton(
-                        selected = selectedSource == SearchMusicUseCase.MusicSource.SPOTIFY,
-                        onClick = { viewModel.setMusicSource(SearchMusicUseCase.MusicSource.SPOTIFY) },
-                        enabled = authState?.isAuthenticated == true
-                    )
-                    Text(
-                        text = stringResource(R.string.spotify),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = if (authState?.isAuthenticated == true)
-                            MaterialTheme.colorScheme.onSurface
-                        else
-                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                    )
-                }
+                ToggleMusicSourceButton(
+                    selectedSource = selectedSource,
+                    authState = authState,
+                    onSelect = { viewModel.setMusicSource(it) }
+                )
             }
 
             // Spotify authentication warning
@@ -243,6 +230,70 @@ fun SearchScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+enum class SelectionType { SINGLE }
+
+data class ToggleOption(val text: String, val icon: ImageVector, val source: SearchMusicUseCase.MusicSource)
+
+@Composable
+fun ToggleMusicSourceButton(
+    selectedSource: SearchMusicUseCase.MusicSource,
+    authState: AuthState?,
+    onSelect: (SearchMusicUseCase.MusicSource) -> Unit
+) {
+    val options = listOf(
+        ToggleOption("YouTube", Icons.Default.PlayArrow, SearchMusicUseCase.MusicSource.YOUTUBE),
+        ToggleOption("Spotify", Icons.Default.Star, SearchMusicUseCase.MusicSource.SPOTIFY)
+    )
+
+    val selected = remember { mutableStateMapOf<String, ToggleOption>() }
+
+    Row(Modifier.padding(0.dp).height(52.dp)) {
+        options.forEachIndexed { i, opt ->
+            val isSelected = selectedSource == opt.source
+            val isEnabled = opt.source != SearchMusicUseCase.MusicSource.SPOTIFY || authState?.isAuthenticated == true
+
+            Button(
+                onClick = {
+                    if (isEnabled) {
+                        selected.clear()
+                        selected[opt.text] = opt
+                        onSelect(opt.source)
+                    }
+                },
+                shape = RoundedCornerShape(6.dp),
+                elevation = ButtonDefaults.buttonElevation(0.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp),
+                colors = ButtonDefaults.buttonColors(MaterialTheme.colorScheme.background),
+                modifier = Modifier
+                    .padding(end = if (i < options.size - 1) 4.dp else 0.dp)
+                    .weight(1f),
+                enabled = isEnabled
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val selectedColor = when (opt.source) {
+                        SearchMusicUseCase.MusicSource.YOUTUBE -> Color.Red
+                        SearchMusicUseCase.MusicSource.SPOTIFY -> Color(0xFF1DB954) // warna hijau Spotify
+                    }
+
+                    val textAndIconColor = if (isSelected) selectedColor else Color.LightGray
+
+                    Text(
+                        opt.text,
+                        color = textAndIconColor
+                    )
+                    Icon(
+                        opt.icon,
+                        contentDescription = null,
+                        tint = textAndIconColor,
+                        modifier = Modifier.padding(start = 8.dp)
+                    )
+
                 }
             }
         }
