@@ -58,11 +58,16 @@ class SpotifyAuthHandler @Inject constructor(
             .build()
 
         try {
+            // Add flags to the intent
+            customTabsIntent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             customTabsIntent.launchUrl(context, uri)
         } catch (e: Exception) {
             Log.e(TAG, "Error launching Spotify auth: ${e.message}")
             // Fallback to regular browser if Custom Tabs not available
-            val browserIntent = Intent(Intent.ACTION_VIEW, uri)
+            val browserIntent = Intent(Intent.ACTION_VIEW, uri).apply {
+                // Add FLAG_ACTIVITY_NEW_TASK to browserIntent too
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
             context.startActivity(browserIntent)
         }
     }
@@ -80,15 +85,22 @@ class SpotifyAuthHandler @Inject constructor(
      */
     suspend fun exchangeAuthorizationCode(code: String): Resource<AuthState> = withContext(Dispatchers.IO) {
         try {
+            // Tambahkan log untuk debugging
+            Log.d(TAG, "Exchanging auth code: $code (length: ${code.length})")
+            Log.d(TAG, "Using redirect URI: ${ApiCredentials.SPOTIFY_REDIRECT_URI}")
+
+            // Buat auth string untuk Basic Auth
             val authString = "${ApiCredentials.SPOTIFY_CLIENT_ID}:${ApiCredentials.SPOTIFY_CLIENT_SECRET}"
             val encodedAuth = Base64.encodeToString(authString.toByteArray(), Base64.NO_WRAP)
 
+            // Buat form body
             val formBody = FormBody.Builder()
                 .add("grant_type", "authorization_code")
-                .add("code", code)
+                .add("code", code.trim()) // Trim untuk menghilangkan spasi yang mungkin ada
                 .add("redirect_uri", ApiCredentials.SPOTIFY_REDIRECT_URI)
                 .build()
 
+            // Buat request
             val request = Request.Builder()
                 .url(tokenEndpoint)
                 .post(formBody)
@@ -96,14 +108,25 @@ class SpotifyAuthHandler @Inject constructor(
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .build()
 
+            // Log request untuk debugging
+            Log.d(TAG, "Sending token request to: $tokenEndpoint")
+            Log.d(TAG, "Headers: ${request.headers}")
+
+            // Eksekusi request
             val response = okHttpClient.newCall(request).execute()
 
+            // Log response untuk debugging
+            Log.d(TAG, "Response code: ${response.code}")
+
             if (!response.isSuccessful) {
-                Log.e(TAG, "Token exchange failed: ${response.code}")
-                return@withContext Resource.Error("Failed to get token: ${response.message}")
+                val responseBody = response.body?.string()
+                Log.e(TAG, "Token exchange failed: ${response.code}, Body: $responseBody")
+                return@withContext Resource.Error("Failed to get token: ${response.message}, $responseBody")
             }
 
             val responseBody = response.body?.string()
+            Log.d(TAG, "Response body: $responseBody")
+
             val tokenResponse = gson.fromJson(responseBody, SpotifyTokenResponse::class.java)
 
             val authState = AuthState(
@@ -115,11 +138,8 @@ class SpotifyAuthHandler @Inject constructor(
             )
 
             return@withContext Resource.Success(authState)
-        } catch (e: IOException) {
-            Log.e(TAG, "Network error: ${e.message}")
-            return@withContext Resource.Error("Network error: ${e.message}", e)
         } catch (e: Exception) {
-            Log.e(TAG, "Error exchanging code for token: ${e.message}")
+            Log.e(TAG, "Error exchanging code: ${e.message}", e)
             return@withContext Resource.Error("Error: ${e.message}", e)
         }
     }

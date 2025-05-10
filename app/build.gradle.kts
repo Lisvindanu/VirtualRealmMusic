@@ -48,8 +48,8 @@ android {
         buildConfigField("String", "YOUTUBE_API_KEY", "\"${getProperty("youtube.api.key", "")}\"")
         manifestPlaceholders.put("redirectSchemeName", "com.virtualrealm.virtualrealmmusicplayer")
         manifestPlaceholders.put("redirectHostName", "callback")
+        manifestPlaceholders.put("appAuthRedirectScheme", "com.virtualrealm.virtualrealmmusicplayer")
     }
-
     buildTypes {
         release {
             isMinifyEnabled = false
