@@ -32,7 +32,7 @@ android {
     }
     defaultConfig {
         applicationId = "com.virtualrealm.virtualrealmmusicplayer"
-        minSdk = 23
+        minSdk = 24
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
@@ -104,6 +104,9 @@ dependencies {
     // Compose Navigation
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+
+    // Animated Bottom Navigation Bar
+    implementation("com.exyte:animated-navigation-bar:1.0.0")
 
     // Accompanist (Compose utilities)
     implementation(libs.accompanist.permissions)

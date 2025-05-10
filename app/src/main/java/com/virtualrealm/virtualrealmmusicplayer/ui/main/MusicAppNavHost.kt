@@ -1,26 +1,29 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/main/MusicAppNavHost.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.main
 
-import androidx.compose.foundation.layout.padding
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.currentBackStackEntryAsState
-import androidx.navigation.compose.rememberNavController
+import androidx.navigation.compose.*
 import androidx.navigation.navArgument
+import com.exyte.animatednavbar.AnimatedNavigationBar
+import com.exyte.animatednavbar.animation.balltrajectory.Parabolic
+import com.exyte.animatednavbar.animation.balltrajectory.Straight
+import com.exyte.animatednavbar.animation.indendshape.Height
+import com.exyte.animatednavbar.animation.indendshape.shapeCornerRadius
 import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.AuthState
 import com.virtualrealm.virtualrealmmusicplayer.ui.auth.LoginScreen
@@ -60,24 +63,42 @@ fun MusicAppNavHost(
     Scaffold(
         bottomBar = {
             if (showBottomNav) {
-                NavigationBar {
-                    bottomNavItems.forEach { item ->
-                        NavigationBarItem(
-                            icon = { Icon(item.icon, contentDescription = item.label) },
-                            label = { Text(item.label) },
-                            selected = currentRoute == item.route,
-                            onClick = {
-                                if (currentRoute != item.route) {
-                                    navController.navigate(item.route) {
-                                        popUpTo(navController.graph.startDestinationId) {
-                                            saveState = true
+                AnimatedNavigationBar(
+                    modifier = Modifier.height(64.dp),
+                    selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute },
+                    cornerRadius = shapeCornerRadius(0.dp),
+                    ballAnimation = Parabolic(tween(300)),
+                    indentAnimation = Height(tween(300)),
+                    barColor = MaterialTheme.colorScheme.primary,
+                    ballColor = MaterialTheme.colorScheme.primary
+                ) {
+                    bottomNavItems.forEachIndexed { index, item ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .noRippleClickable {
+                                    if (currentRoute != item.route) {
+                                        navController.navigate(item.route) {
+                                            popUpTo(navController.graph.startDestinationId) {
+                                                saveState = true
+                                            }
+                                            launchSingleTop = true
+                                            restoreState = true
                                         }
-                                        launchSingleTop = true
-                                        restoreState = true
                                     }
-                                }
-                            }
-                        )
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                modifier = Modifier.size(26.dp),
+                                imageVector = item.icon,
+                                contentDescription = item.label,
+                                tint = if (currentRoute == item.route)
+                                    MaterialTheme.colorScheme.onPrimary
+                                else
+                                    MaterialTheme.colorScheme.inversePrimary
+                            )
+                        }
                     }
                 }
             }
@@ -106,9 +127,7 @@ fun MusicAppNavHost(
             composable(Screen.Home.route) {
                 HomeScreen(
                     onNavigateToPlayer = { musicId, musicType ->
-                        navController.navigate(
-                            Screen.Player.createRoute(musicId, musicType)
-                        )
+                        navController.navigate(Screen.Player.createRoute(musicId, musicType))
                     },
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.route)
@@ -124,9 +143,7 @@ fun MusicAppNavHost(
             composable(Screen.Search.route) {
                 SearchScreen(
                     onNavigateToPlayer = { musicId, musicType ->
-                        navController.navigate(
-                            Screen.Player.createRoute(musicId, musicType)
-                        )
+                        navController.navigate(Screen.Player.createRoute(musicId, musicType))
                     }
                 )
             }
@@ -159,12 +176,19 @@ fun MusicAppNavHost(
                         navController.popBackStack()
                     },
                     onNavigateToPlayer = { musicId, musicType ->
-                        navController.navigate(
-                            Screen.Player.createRoute(musicId, musicType)
-                        )
+                        navController.navigate(Screen.Player.createRoute(musicId, musicType))
                     }
                 )
             }
         }
+    }
+}
+
+fun Modifier.noRippleClickable(onClick: () -> Unit): Modifier = composed {
+    clickable(
+        indication = null,
+        interactionSource = remember { MutableInteractionSource() }
+    ) {
+        onClick()
     }
 }
