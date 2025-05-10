@@ -5,6 +5,7 @@ package com.virtualrealm.virtualrealmmusicplayer.di
 import android.app.Application
 import android.content.Context
 import com.virtualrealm.virtualrealmmusicplayer.service.SpotifyPlayerManager
+import com.virtualrealm.virtualrealmmusicplayer.service.SpotifyWebPlayerHelper
 import com.virtualrealm.virtualrealmmusicplayer.service.YoutubeAudioHelper
 import dagger.Module
 import dagger.Provides
@@ -33,5 +34,10 @@ object AppModule {
     @Singleton
     fun provideSpotifyPlayerManager(@ApplicationContext context: Context): SpotifyPlayerManager {
         return SpotifyPlayerManager(context)
+    }
+    @Provides
+    @Singleton
+    fun provideSpotifyWebPlayerHelper(@ApplicationContext context: Context): SpotifyWebPlayerHelper {
+        return SpotifyWebPlayerHelper(context)
     }
 }

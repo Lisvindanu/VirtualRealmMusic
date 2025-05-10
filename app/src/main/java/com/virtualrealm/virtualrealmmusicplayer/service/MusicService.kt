@@ -35,6 +35,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
@@ -57,9 +58,13 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     @Inject
     lateinit var spotifyPlayerManager: SpotifyPlayerManager
 
+    @Inject
+    lateinit var spotifyWebPlayerHelper: SpotifyWebPlayerHelper
+
     private val binder = MusicBinder()
     private var mediaPlayer: MediaPlayer? = null
     private var currentMusic: Music? = null
+    private var currentAudioUrl: String? = null
     private var mediaSession: MediaSessionCompat? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
@@ -101,6 +106,33 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
         // Initialize YouTubeAudioPlayer
         youTubeAudioPlayer.initialize()
+
+        // Initialize SpotifyWebPlayerHelper
+        spotifyWebPlayerHelper.initialize()
+
+        // Setup callbacks for SpotifyWebPlayerHelper
+        spotifyWebPlayerHelper.onPrepared = {
+            _playbackState.value = PlaybackState.PLAYING
+            updatePlaybackState(PlaybackState.PLAYING)
+            updateNotification()
+        }
+
+        spotifyWebPlayerHelper.onError = { message ->
+            Log.e(TAG, "Spotify Web Player error: $message")
+
+            // Jika error membutuhkan login, tampilkan antarmuka login
+            if (message.contains("login", ignoreCase = true)) {
+                spotifyWebPlayerHelper.showLoginInterface()
+            } else {
+                // Otherwise, try fallback
+                _playbackState.value = PlaybackState.ERROR
+                tryPlayFallbackAudio()
+            }
+        }
+
+        spotifyWebPlayerHelper.onCompletion = {
+            skipToNext()
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             createNotificationChannel()
@@ -241,7 +273,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
-     fun playMusic(music: Music) {
+    fun playMusic(music: Music) {
         lifecycleScope.launch {
             try {
                 Log.d(TAG, "Starting to play music: ${music.title}")
@@ -251,21 +283,44 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
                 // Extract URL audio
                 val audioUrl = musicExtractionService.extractAudioUrl(music)
+                currentAudioUrl = audioUrl
                 Log.d(TAG, "Using audio URL: $audioUrl")
 
                 when {
-                    // Handle Spotify track
+                    // Handle Spotify Web Player
+                    audioUrl.startsWith("spotifyweb://") -> {
+                        val spotifyId = audioUrl.substringAfter("spotifyweb://")
+                        Log.d(TAG, "Playing Spotify track with WebPlayer ID: $spotifyId")
+
+                        // Coba putar menggunakan Spotify Web Player
+                        spotifyWebPlayerHelper.loadAndPlayTrack(spotifyId)
+
+                        // Set status ke preparing dan update UI
+                        _playbackState.value = PlaybackState.PREPARING
+                        updatePlaybackState(PlaybackState.PREPARING)
+                        updateMediaSessionMetadata(music)
+                        updateNotification()
+                    }
+
+                    // Handle Spotify track with native app
                     audioUrl.startsWith("spotify://") -> {
                         val spotifyUri = audioUrl.substringAfter("spotify://")
 
                         // Cek apakah Spotify terpasang
                         if (!spotifyPlayerManager.isSpotifyInstalled()) {
-                            Log.e(TAG, "Spotify app not installed")
-                            _playbackState.value = PlaybackState.ERROR
+                            Log.e(TAG, "Spotify app not installed, falling back to Spotify Web Player")
+                            // Fallback to Spotify Web Player
+                            val trackId = music.id
+                            spotifyWebPlayerHelper.loadAndPlayTrack(trackId)
+
+                            _playbackState.value = PlaybackState.PREPARING
+                            updatePlaybackState(PlaybackState.PREPARING)
+                            updateMediaSessionMetadata(music)
+                            updateNotification()
                             return@launch
                         }
 
-                        // Connect ke Spotify
+                        // Connect ke Spotify app
                         if (!spotifyPlayerManager.isConnected.value) {
                             spotifyPlayerManager.connect(
                                 onConnected = {
@@ -280,7 +335,10 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                                 },
                                 onFailure = { error ->
                                     Log.e(TAG, "Spotify connection error: $error")
-                                    _playbackState.value = PlaybackState.ERROR
+
+                                    // Fallback to Spotify Web Player
+                                    val trackId = music.id
+                                    spotifyWebPlayerHelper.loadAndPlayTrack(trackId)
                                 }
                             )
                         } else {
@@ -319,6 +377,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                         youTubeAudioPlayer.onError = { message ->
                             Log.e(TAG, "YouTube player error: $message")
                             _playbackState.value = PlaybackState.ERROR
+                            tryPlayFallbackAudio()
                         }
 
                         // Load dan putar YouTube
@@ -345,6 +404,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                             } catch (e: Exception) {
                                 Log.e(TAG, "Error preparing media player: ${e.message}", e)
                                 _playbackState.value = PlaybackState.ERROR
+                                tryPlayFallbackAudio()
                             }
                         }
                     }
@@ -356,7 +416,23 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
             } catch (e: Exception) {
                 Log.e(TAG, "Error in playMusic: ${e.message}", e)
                 _playbackState.value = PlaybackState.ERROR
+                tryPlayFallbackAudio()
             }
+        }
+    }
+
+    private fun tryPlayFallbackAudio() {
+        try {
+            // Gunakan file audio yang lebih kecil dan reliable
+            val fallbackUrl = "https://www.kozco.com/tech/piano2.wav"
+
+            Log.d(TAG, "Playing fallback audio: $fallbackUrl")
+            mediaPlayer?.reset()
+            mediaPlayer?.setDataSource(fallbackUrl)
+            mediaPlayer?.prepareAsync()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error playing fallback: ${e.message}", e)
+            _playbackState.value = PlaybackState.ERROR
         }
     }
 
@@ -404,12 +480,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
             else -> PlaybackStateCompat.STATE_NONE
         }
 
-        val currentPosition = if (currentMusic is Music.YoutubeVideo &&
-            _playbackState.value == PlaybackState.PLAYING) {
-            youTubeAudioPlayer.currentPosition.value
-        } else {
-            mediaPlayer?.currentPosition?.toLong() ?: 0
-        }
+        val currentPosition = getCurrentPosition()
 
         playbackStateBuilder.setState(playbackState, currentPosition, 1.0f)
         playbackStateBuilder.setActions(actions)
@@ -455,36 +526,56 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     fun play() {
         when {
-            // Untuk Spotify
-            currentMusic is Music.SpotifyTrack -> {
-                spotifyPlayerManager.resume()
+            // Untuk Spotify Web Player
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                spotifyWebPlayerHelper.play()
                 _playbackState.value = PlaybackState.PLAYING
                 updatePlaybackState(PlaybackState.PLAYING)
-
-                // Update notification
                 updateNotification()
-            }
 
-            // Bagian kode lainnya untuk YouTube dan MediaPlayer tetap sama
-            currentMusic is Music.YoutubeVideo &&
-                    _currentTrack.value?.id?.startsWith("youtube://") == true -> {
-                youTubeAudioPlayer.play()
-                _playbackState.value = PlaybackState.PLAYING
-                updatePlaybackState(PlaybackState.PLAYING)
-
-                // Use the appropriate overload based on API level
+                // Start foreground service
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
                 } else {
                     startForeground(NOTIFICATION_ID, createNotification())
                 }
             }
+
+            // Untuk Spotify app
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotify://") == true -> {
+                spotifyPlayerManager.resume()
+                _playbackState.value = PlaybackState.PLAYING
+                updatePlaybackState(PlaybackState.PLAYING)
+
+                // Start foreground service
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                } else {
+                    startForeground(NOTIFICATION_ID, createNotification())
+                }
+            }
+
+            // Untuk YouTube
+            currentMusic is Music.YoutubeVideo && currentAudioUrl?.startsWith("youtube://") == true -> {
+                youTubeAudioPlayer.play()
+                _playbackState.value = PlaybackState.PLAYING
+                updatePlaybackState(PlaybackState.PLAYING)
+
+                // Start foreground service
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+                } else {
+                    startForeground(NOTIFICATION_ID, createNotification())
+                }
+            }
+
+            // Untuk MediaPlayer
             _playbackState.value == PlaybackState.PAUSED -> {
                 mediaPlayer?.start()
                 _playbackState.value = PlaybackState.PLAYING
                 updatePlaybackState(PlaybackState.PLAYING)
 
-                // Use the appropriate overload based on API level
+                // Start foreground service
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     startForeground(NOTIFICATION_ID, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
                 } else {
@@ -494,25 +585,33 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
-    // Perbarui metode pause() untuk menangani Spotify
     fun pause() {
         when {
-            // Untuk Spotify
-            currentMusic is Music.SpotifyTrack -> {
+            // Untuk Spotify Web Player
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                spotifyWebPlayerHelper.pause()
+                _playbackState.value = PlaybackState.PAUSED
+                updatePlaybackState(PlaybackState.PAUSED)
+                updateNotification()
+            }
+
+            // Untuk Spotify app
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotify://") == true -> {
                 spotifyPlayerManager.pause()
                 _playbackState.value = PlaybackState.PAUSED
                 updatePlaybackState(PlaybackState.PAUSED)
                 updateNotification()
             }
 
-            // Bagian kode lainnya untuk YouTube dan MediaPlayer tetap sama
-            currentMusic is Music.YoutubeVideo &&
-                    _currentTrack.value?.id?.startsWith("youtube://") == true -> {
+            // Untuk YouTube
+            currentMusic is Music.YoutubeVideo && currentAudioUrl?.startsWith("youtube://") == true -> {
                 youTubeAudioPlayer.pause()
                 _playbackState.value = PlaybackState.PAUSED
                 updatePlaybackState(PlaybackState.PAUSED)
                 updateNotification()
             }
+
+            // Untuk MediaPlayer
             _playbackState.value == PlaybackState.PLAYING -> {
                 mediaPlayer?.pause()
                 _playbackState.value = PlaybackState.PAUSED
@@ -523,11 +622,25 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     }
 
     fun stop() {
-        if (currentMusic is Music.YoutubeVideo &&
-            _currentTrack.value?.id?.startsWith("youtube://") == true) {
-            youTubeAudioPlayer.stop()
-        } else {
-            mediaPlayer?.stop()
+        when {
+            // Untuk Spotify Web Player
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                spotifyWebPlayerHelper.pause() // Web player doesn't have stop method
+            }
+
+            // Untuk YouTube
+            currentMusic is Music.YoutubeVideo && currentAudioUrl?.startsWith("youtube://") == true -> {
+                youTubeAudioPlayer.stop()
+            }
+
+            // Untuk MediaPlayer
+            else -> {
+                try {
+                    mediaPlayer?.stop()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error stopping media player: ${e.message}")
+                }
+            }
         }
 
         _playbackState.value = PlaybackState.STOPPED
@@ -651,20 +764,8 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
             PlaybackState.ERROR -> "ERROR"
         }
 
-        val positionMs = if (currentMusic is Music.YoutubeVideo &&
-            _playbackState.value == PlaybackState.PLAYING) {
-            youTubeAudioPlayer.currentPosition.value
-        } else {
-            mediaPlayer?.currentPosition ?: -1
-        }
-
-        val durationMs = if (currentMusic is Music.YoutubeVideo &&
-            _playbackState.value == PlaybackState.PLAYING) {
-            youTubeAudioPlayer.duration.value
-        } else {
-            mediaPlayer?.duration ?: -1
-        }
-
+        val positionMs = getCurrentPosition()
+        val durationMs = getDuration()
         val musicInfo = currentMusic?.let { "${it.title} (${it.id})" } ?: "No music"
 
         Log.d("MusicService", "Playback state: $stateStr | Music: $musicInfo | Position: ${positionMs}ms/${durationMs}ms | $additionalInfo")
@@ -708,6 +809,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                         Log.e("MusicService", "Error in YouTube fallback: ${e.message}", e)
                         _playbackState.value = PlaybackState.ERROR
                         updatePlaybackState(PlaybackState.STOPPED)
+                        tryPlayFallbackAudio()
                     }
                 }
                 return true
@@ -716,18 +818,7 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
         // For non-YouTube media, try with a backup URL
         serviceScope.launch {
-            try {
-                val fallbackUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-
-                Log.d("MusicService", "Retrying with fallback URL: $fallbackUrl")
-                mediaPlayer?.reset()
-                mediaPlayer?.setDataSource(fallbackUrl)
-                mediaPlayer?.prepareAsync()
-            } catch (e: Exception) {
-                Log.e("MusicService", "Error in fallback: ${e.message}", e)
-                _playbackState.value = PlaybackState.ERROR
-                updatePlaybackState(PlaybackState.STOPPED)
-            }
+            tryPlayFallbackAudio()
         }
 
         return true
@@ -757,7 +848,8 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     override fun onDestroy() {
         serviceScope.cancel()
-        spotifyPlayerManager.disconnect() // Pastikan memanggil ini
+        spotifyPlayerManager.disconnect()
+        spotifyWebPlayerHelper.release()
         youTubeAudioPlayer.release()
         mediaPlayer?.release()
         mediaPlayer = null
@@ -774,12 +866,17 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         const val ACTION_PREVIOUS = "com.virtualrealm.virtualrealmmusicplayer.action.PREVIOUS"
     }
 
-
-
     // Mendapatkan posisi pemutaran saat ini (dalam ms)
     fun getCurrentPosition(): Long {
         return when {
-            // Untuk Spotify
+            // Untuk Spotify Web Player
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                val position = spotifyWebPlayerHelper.currentPosition.value
+                Log.d("MusicService", "Spotify Web current position: $position ms")
+                position
+            }
+
+            // Untuk Spotify App
             currentMusic is Music.SpotifyTrack && spotifyPlayerManager.isConnected.value -> {
                 val position = spotifyPlayerManager.getCurrentPosition()
                 Log.d("MusicService", "Spotify current position: $position ms")
@@ -812,6 +909,17 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     // Mendapatkan durasi total (dalam ms)
     fun getDuration(): Long {
         return when {
+            // Untuk Spotify Web Player
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                val duration = spotifyWebPlayerHelper.duration.value
+                if (duration > 0) {
+                    duration
+                } else {
+                    (currentMusic as Music.SpotifyTrack).durationMs
+                }
+            }
+
+            // Untuk Spotify App
             currentMusic is Music.SpotifyTrack && spotifyPlayerManager.isConnected.value -> {
                 val duration = spotifyPlayerManager.getDuration()
                 if (duration > 0) {
@@ -860,13 +968,17 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
-
     // Mengubah posisi pemutaran (dalam ms)
     fun seekTo(position: Long) {
         Log.d("MusicService", "Seeking to position: $position ms")
 
         when {
-            // Untuk Spotify
+            // Untuk Spotify Web Player
+            currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                spotifyWebPlayerHelper.seekTo(position)
+            }
+
+            // Untuk Spotify app
             currentMusic is Music.SpotifyTrack && spotifyPlayerManager.isConnected.value -> {
                 spotifyPlayerManager.seekTo(position)
             }
@@ -884,4 +996,5 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                 }
             }
         }
-    } }
+    }
+    }

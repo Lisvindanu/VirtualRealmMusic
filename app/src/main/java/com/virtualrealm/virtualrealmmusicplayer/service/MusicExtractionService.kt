@@ -18,7 +18,7 @@ class MusicExtractionService @Inject constructor() {
             when (music) {
                 is Music.SpotifyTrack -> {
                     // For Spotify, return the Spotify URI to be used by SpotifyPlayerManager
-                    "spotify://${music.uri}"
+                    "spotifyweb://${music.id}"
                 }
                 is Music.YoutubeVideo -> {
                     // Return URL for WebView, not MediaPlayer
