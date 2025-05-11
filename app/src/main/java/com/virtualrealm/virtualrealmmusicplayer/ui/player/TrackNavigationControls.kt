@@ -1,3 +1,4 @@
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/TrackNavigationControls.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
 import androidx.compose.foundation.clickable
@@ -19,9 +20,6 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 
 /**
  * A composable that displays navigation controls for a playlist
- *
- * NOTE: Function name changed from PlaylistNavigator to TrackNavigationControls
- * to avoid conflicts with another function with the same name in the codebase
  */
 @Composable
 fun TrackNavigationControls(
