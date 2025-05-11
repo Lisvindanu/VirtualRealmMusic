@@ -1,9 +1,6 @@
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -11,8 +8,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,8 +82,7 @@ fun MusicInfoSection(
 
                 SourceTag(
                     text = "Spotify",
-                    contentColor = SpotifyGreen,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    contentColor = SpotifyGreen
                 )
             }
             is Music.YoutubeVideo -> {
@@ -106,8 +100,7 @@ fun MusicInfoSection(
 
                 SourceTag(
                     text = "YouTube",
-                    contentColor = YouTubeRed,
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    contentColor = YouTubeRed
                 )
             }
         }
@@ -132,9 +125,9 @@ fun MusicInfoSection(
             onSkipNext = onSkipNext
         )
 
-        // Playlist navigator
+        // Playlist navigator - using the renamed TrackNavigationControls
         if (playlist.isNotEmpty() && playlist.size > 1) {
-            PlaylistNavigator(
+            TrackNavigationControls(
                 playlist = playlist,
                 currentIndex = currentIndex,
                 onPreviousClick = onSkipPrevious,
@@ -149,9 +142,7 @@ fun MusicInfoSection(
         // Favorite button
         IconButton(
             onClick = onToggleFavorite,
-            modifier = Modifier
-                .size(48.dp)
-                .align(Alignment.CenterHorizontally)
+            modifier = Modifier.size(48.dp)
         ) {
             Icon(
                 imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
