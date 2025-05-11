@@ -1,4 +1,5 @@
 // app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/main/MusicAppNavHost.kt
+
 package com.virtualrealm.virtualrealmmusicplayer.ui.main
 
 import androidx.compose.animation.core.tween
@@ -21,7 +22,6 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import com.exyte.animatednavbar.AnimatedNavigationBar
 import com.exyte.animatednavbar.animation.balltrajectory.Parabolic
-import com.exyte.animatednavbar.animation.balltrajectory.Straight
 import com.exyte.animatednavbar.animation.indendshape.Height
 import com.exyte.animatednavbar.animation.indendshape.shapeCornerRadius
 import com.virtualrealm.virtualrealmmusicplayer.R
@@ -131,6 +131,9 @@ fun MusicAppNavHost(
                     },
                     onNavigateToSearch = {
                         navController.navigate(Screen.Search.route)
+                    },
+                    onNavigateToPlaylist = {
+                        navController.navigate(Screen.Playlist.route)
                     },
                     onLogout = {
                         navController.navigate(Screen.Login.route) {

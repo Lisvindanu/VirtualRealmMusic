@@ -11,17 +11,18 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,6 +31,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,6 +45,7 @@ import com.virtualrealm.virtualrealmmusicplayer.ui.main.MainViewModel
 import com.virtualrealm.virtualrealmmusicplayer.ui.player.MusicViewModel
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.SpotifyGreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.YouTubeRed
+import com.virtualrealm.virtualrealmmusicplayer.util.getMusicType
 import kotlinx.coroutines.launch
 
 
@@ -50,7 +54,8 @@ import kotlinx.coroutines.launch
 fun PlaylistScreen(
     onNavigateBack: () -> Unit,
     onNavigateToPlayer: (String, String) -> Unit,
-    musicViewModel: MusicViewModel = hiltViewModel()
+    musicViewModel: MusicViewModel = hiltViewModel(),
+    mainViewModel: MainViewModel = hiltViewModel()
 ) {
     val playlist by musicViewModel.playlist.collectAsState()
     val currentIndex by musicViewModel.currentIndex.collectAsState()
@@ -68,7 +73,6 @@ fun PlaylistScreen(
     var playlistToOverwrite by remember { mutableStateOf("") }
 
     // Get saved playlists from MainViewModel
-    val mainViewModel: MainViewModel = hiltViewModel()
     val savedPlaylists by mainViewModel.savedPlaylists.collectAsState()
 
     val lazyListState = rememberLazyListState()
@@ -145,7 +149,17 @@ fun PlaylistScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp),
+                        .height(64.dp)
+                        .clickable {
+                            currentTrack?.let {
+                                onNavigateToPlayer(it.id,
+                                    when (it) {
+                                        is Music.SpotifyTrack -> "spotify"
+                                        is Music.YoutubeVideo -> "youtube"
+                                    }
+                                )
+                            }
+                        },
                     color = MaterialTheme.colorScheme.primaryContainer,
                     shadowElevation = 8.dp
                 ) {
@@ -264,12 +278,7 @@ fun PlaylistScreen(
                                     // Play this track
                                     musicViewModel.setPlaylist(playlist, index)
                                     // Navigate to player
-                                    onNavigateToPlayer(music.id,
-                                        when (music) {
-                                            is Music.SpotifyTrack -> "spotify"
-                                            is Music.YoutubeVideo -> "youtube"
-                                        }
-                                    )
+                                    onNavigateToPlayer(music.id, music.getMusicType())
                                 },
                                 onRemove = {
                                     showRemoveConfirmation = true
@@ -458,7 +467,7 @@ fun PlaylistScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PlaylistItemCard(
+private fun PlaylistItemCard(
     music: Music,
     index: Int,
     isPlaying: Boolean,
@@ -476,11 +485,14 @@ fun PlaylistItemCard(
         onClick = onClick,
         colors = if (isPlaying) {
             CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
             )
         } else {
             CardDefaults.cardColors()
-        }
+        },
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isPlaying) 4.dp else 1.dp
+        )
     ) {
         Row(
             modifier = Modifier
@@ -488,19 +500,28 @@ fun PlaylistItemCard(
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Index number
-            Text(
-                text = "${index + 1}",
-                style = MaterialTheme.typography.titleSmall,
-                color = if (isPlaying) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            // Index number with improved styling
+            Box(
                 modifier = Modifier
-                    .size(24.dp)
+                    .size(32.dp)
                     .background(
-                        color = if (isPlaying) MaterialTheme.colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent,
-                        shape = MaterialTheme.shapes.small
-                    )
-                    .padding(4.dp)
-            )
+                        color = if (isPlaying)
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
+                        else
+                            MaterialTheme.colorScheme.surfaceVariant,
+                        shape = CircleShape
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "${index + 1}",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = if (isPlaying)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             // Thumbnail
             AsyncImage(
@@ -526,7 +547,8 @@ fun PlaylistItemCard(
                     text = music.title,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (isPlaying) FontWeight.Bold else FontWeight.Normal
                 )
                 Text(
                     text = music.artists,
@@ -536,7 +558,7 @@ fun PlaylistItemCard(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                // Source badge
+                // Source badge with improved design
                 Box(
                     modifier = Modifier
                         .padding(top = 4.dp)
@@ -549,28 +571,55 @@ fun PlaylistItemCard(
                         )
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Text(
-                        text = when (music) {
-                            is Music.SpotifyTrack -> "Spotify"
-                            is Music.YoutubeVideo -> "YouTube"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = when (music) {
-                            is Music.SpotifyTrack -> SpotifyGreen
-                            is Music.YoutubeVideo -> YouTubeRed
-                        }
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = when (music) {
+                                is Music.SpotifyTrack -> Icons.Default.Audiotrack
+                                is Music.YoutubeVideo -> Icons.Default.VideoLibrary
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(12.dp),
+                            tint = when (music) {
+                                is Music.SpotifyTrack -> SpotifyGreen
+                                is Music.YoutubeVideo -> YouTubeRed
+                            }
+                        )
+                        Text(
+                            text = when (music) {
+                                is Music.SpotifyTrack -> "Spotify"
+                                is Music.YoutubeVideo -> "YouTube"
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = when (music) {
+                                is Music.SpotifyTrack -> SpotifyGreen
+                                is Music.YoutubeVideo -> YouTubeRed
+                            }
+                        )
+                    }
                 }
             }
 
             // Currently playing indicator
             if (isPlaying) {
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.padding(8.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(24.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                            shape = CircleShape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
 
             // Move up/down buttons
@@ -606,8 +655,13 @@ fun PlaylistItemCard(
                 }
             }
 
-            // Remove button
-            IconButton(onClick = onRemove) {
+            // Remove button with improved styling
+            IconButton(
+                onClick = onRemove,
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.error
+                )
+            ) {
                 Icon(
                     imageVector = Icons.Default.Delete,
                     contentDescription = "Remove from playlist",
@@ -615,5 +669,142 @@ fun PlaylistItemCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+fun PlaylistNavigationBar(
+    currentIndex: Int,
+    playlistSize: Int,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
+) {
+    if (playlistSize <= 1) return
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+            .clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick = onPrevious,
+                enabled = playlistSize > 1
+            ) {
+                Icon(
+                    imageVector = Icons.Default.NavigateBefore,
+                    contentDescription = "Previous",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Text(
+                text = "${currentIndex + 1} of $playlistSize",
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold
+            )
+
+            IconButton(
+                onClick = onNext,
+                enabled = playlistSize > 1
+            ) {
+                Icon(
+                    imageVector = Icons.Default.NavigateNext,
+                    contentDescription = "Next",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun AddToPlaylistDialog(
+    track: Music,
+    availablePlaylists: List<String>,
+    onDismiss: () -> Unit,
+    onAddToExisting: (String) -> Unit,
+    onCreateNew: (String) -> Unit
+) {
+    var showNewPlaylistDialog by remember { mutableStateOf(false) }
+
+    if (showNewPlaylistDialog) {
+        SavePlaylistDialog(
+            existingPlaylists = availablePlaylists,
+            onDismiss = { showNewPlaylistDialog = false },
+            onSave = { name ->
+                onCreateNew(name)
+                showNewPlaylistDialog = false
+                onDismiss()
+            }
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Add to Playlist") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 300.dp)
+                ) {
+                    Text(
+                        text = "Select a playlist to add:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    if (availablePlaylists.isEmpty()) {
+                        Text(
+                            text = "No playlists found. Create a new one.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    } else {
+                        LazyColumn {
+                            items(availablePlaylists) { name ->
+                                ListItem(
+                                    headlineText = { Text(name) },
+                                    leadingContent = {
+                                        Icon(
+                                            imageVector = Icons.Default.PlaylistPlay,
+                                            contentDescription = null
+                                        )
+                                    },
+                                    modifier = Modifier.clickable {
+                                        onAddToExisting(name)
+                                        onDismiss()
+                                    }
+                                )
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showNewPlaylistDialog = true
+                    }
+                ) {
+                    Text("Create New")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }
