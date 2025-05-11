@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.service.MusicService
+import com.virtualrealm.virtualrealmmusicplayer.util.PlaylistManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,7 +23,8 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MusicViewModel @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val playlistManager: PlaylistManager
 ) : ViewModel() {
 
     @SuppressLint("StaticFieldLeak")
@@ -41,6 +43,24 @@ class MusicViewModel @Inject constructor(
     private val _currentIndex = MutableStateFlow(0)
     val currentIndex: StateFlow<Int> = _currentIndex.asStateFlow()
 
+    // Track playlist modifications
+    private val _playlistModified = MutableStateFlow(false)
+    val playlistModified: StateFlow<Boolean> = _playlistModified.asStateFlow()
+
+    // Store the last operation for undo functionality
+    private val _lastPlaylistOperation = MutableStateFlow<PlaylistOperation?>(null)
+    val lastPlaylistOperation: StateFlow<PlaylistOperation?> = _lastPlaylistOperation.asStateFlow()
+
+    // Track for undo functionality
+    private var lastRemovedTrack: Pair<Int, Music>? = null
+
+    sealed class PlaylistOperation {
+        data class ADD(val music: Music) : PlaylistOperation()
+        data class REMOVE(val index: Int, val music: Music) : PlaylistOperation()
+        data class MOVE(val fromIndex: Int, val toIndex: Int) : PlaylistOperation()
+        object CLEAR : PlaylistOperation()
+    }
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as MusicService.MusicBinder
@@ -49,6 +69,9 @@ class MusicViewModel @Inject constructor(
 
             // Start observing service state
             observeServiceState()
+
+            // Load saved playlist
+            loadPersistedPlaylist()
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
@@ -83,12 +106,47 @@ class MusicViewModel @Inject constructor(
         viewModelScope.launch {
             musicService?.playlist?.collect { list ->
                 _playlist.value = list
+                // Save playlist to persistent storage
+                persistPlaylist()
             }
         }
 
         viewModelScope.launch {
             musicService?.currentIndex?.collect { index ->
                 _currentIndex.value = index
+            }
+        }
+    }
+
+    // Save playlist to persistent storage
+    private fun persistPlaylist() {
+        viewModelScope.launch {
+            playlistManager.saveCurrentPlaylist(
+                playlist = _playlist.value,
+                currentIndex = _currentIndex.value,
+                position = getCurrentPosition()
+            )
+        }
+    }
+
+    // Load saved playlist
+    private fun loadPersistedPlaylist() {
+        viewModelScope.launch {
+            playlistManager.getCurrentPlaylist().collect { playlistState ->
+                if (playlistState.playlist.isNotEmpty()) {
+                    // Only restore if there's no active playlist
+                    if (_playlist.value.isEmpty()) {
+                        setPlaylist(
+                            playlistState.playlist,
+                            playlistState.currentIndex
+                        )
+
+                        // Seek to saved position
+                        if (playlistState.positionMs > 0) {
+                            seekTo(playlistState.positionMs)
+                        }
+                    }
+                }
             }
         }
     }
@@ -103,10 +161,53 @@ class MusicViewModel @Inject constructor(
 
     fun addToPlaylist(music: Music) {
         musicService?.addToPlaylist(music)
+
+        // Record this operation
+        _lastPlaylistOperation.value = PlaylistOperation.ADD(music)
+        _playlistModified.value = true
     }
 
     fun removeFromPlaylist(index: Int) {
+        // Save for undo
+        val track = _playlist.value.getOrNull(index)
+        if (track != null) {
+            lastRemovedTrack = index to track
+            _lastPlaylistOperation.value = PlaylistOperation.REMOVE(index, track)
+            _playlistModified.value = true
+        }
+
         musicService?.removeFromPlaylist(index)
+    }
+
+    fun undoLastPlaylistOperation() {
+        when (val operation = _lastPlaylistOperation.value) {
+            is PlaylistOperation.REMOVE -> {
+                // Re-add the removed track
+                val (index, track) = lastRemovedTrack ?: return
+                val currentList = _playlist.value.toMutableList()
+                if (index <= currentList.size) {
+                    currentList.add(index, track)
+                    setPlaylist(currentList, _currentIndex.value)
+                }
+            }
+            is PlaylistOperation.ADD -> {
+                // Remove the last added track
+                val track = operation.music
+                val index = _playlist.value.indexOfFirst { it.id == track.id }
+                if (index >= 0) {
+                    removeFromPlaylist(index)
+                }
+            }
+            else -> {} // Other operations don't have undo yet
+        }
+
+        // Clear the last operation
+        _lastPlaylistOperation.value = null
+    }
+
+    fun acknowledgePlaylistModification() {
+        _playlistModified.value = false
+        _lastPlaylistOperation.value = null
     }
 
     fun play() {
@@ -137,23 +238,35 @@ class MusicViewModel @Inject constructor(
         }
     }
 
-    // Fungsi baru untuk mendapatkan posisi pemutaran saat ini
+    // Check if a track is in the playlist
+    fun isTrackInPlaylist(music: Music): Boolean {
+        return _playlist.value.any { it.id == music.id }
+    }
+
+    // Get position of a track in the playlist by ID
+    fun getPlaylistPosition(musicId: String): Int? {
+        val index = _playlist.value.indexOfFirst { it.id == musicId }
+        return if (index >= 0) index else null
+    }
+
+    // Functions for player position control
     fun getCurrentPosition(): Long {
         return musicService?.getCurrentPosition() ?: 0
     }
 
-    // Fungsi baru untuk mendapatkan durasi total
     fun getDuration(): Long {
         return musicService?.getDuration() ?: 0
     }
 
-    // Fungsi baru untuk mengubah posisi pemutaran
     fun seekTo(position: Long) {
         musicService?.seekTo(position)
     }
 
     override fun onCleared() {
         if (bound) {
+            // Save playlist before unbinding
+            persistPlaylist()
+
             context.unbindService(connection)
             bound = false
         }

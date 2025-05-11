@@ -218,8 +218,16 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     fun addToPlaylist(music: Music) {
         val currentList = _playlist.value.toMutableList()
-        currentList.add(music)
-        _playlist.value = currentList
+        // Check if the track already exists in the playlist to avoid duplicates
+        if (!currentList.any { it.id == music.id }) {
+            currentList.add(music)
+            _playlist.value = currentList
+
+            // If this is the first track added to an empty playlist, start playing it
+            if (currentList.size == 1) {
+                playMusicFromPlaylist(0)
+            }
+        }
     }
 
     fun removeFromPlaylist(index: Int) {
@@ -254,22 +262,30 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
             playMusic(_playlist.value[index])
         }
     }
-
     fun skipToNext() {
         if (_playlist.value.isNotEmpty()) {
+            // Increment index and keep it within bounds
             val nextIndex = (_currentIndex.value + 1) % _playlist.value.size
             playMusicFromPlaylist(nextIndex)
+        } else if (currentMusic != null) {
+            // If there's a current track but no playlist, restart the current track
+            currentMusic?.let { playMusic(it) }
         }
     }
 
+
     fun skipToPrevious() {
         if (_playlist.value.isNotEmpty()) {
+            // Decrement index and keep it within bounds (wrap around to end)
             val prevIndex = if (_currentIndex.value > 0) {
                 _currentIndex.value - 1
             } else {
-                _playlist.value.size - 1
+                _playlist.value.size - 1  // Go to the last track if we're at the first one
             }
             playMusicFromPlaylist(prevIndex)
+        } else if (currentMusic != null) {
+            // If there's a current track but no playlist, restart the current track
+            currentMusic?.let { playMusic(it) }
         }
     }
 
