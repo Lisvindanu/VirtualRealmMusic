@@ -12,6 +12,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.service.MusicService
+import com.virtualrealm.virtualrealmmusicplayer.ui.main.MainViewModel
 import com.virtualrealm.virtualrealmmusicplayer.util.PlaylistManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -230,12 +231,16 @@ class MusicViewModel @Inject constructor(
         musicService?.skipToPrevious()
     }
 
+    // Modify togglePlayPause to better handle different source types
     fun togglePlayPause() {
         if (_isPlaying.value) {
             pause()
         } else {
             play()
         }
+
+        // Update UI state immediately without waiting for service callback
+        _isPlaying.value = !_isPlaying.value
     }
 
     // Check if a track is in the playlist
@@ -261,6 +266,89 @@ class MusicViewModel @Inject constructor(
     fun seekTo(position: Long) {
         musicService?.seekTo(position)
     }
+
+    fun playTrackAndUpdatePlaylist(music: Music) {
+        viewModelScope.launch {
+            // First check if track is already in playlist
+            val currentList = _playlist.value
+            val index = currentList.indexOfFirst { it.id == music.id }
+
+            if (index >= 0) {
+                // Track exists in playlist - play it at its position
+                _currentIndex.value = index
+                playMusic(music)
+            } else {
+                // Track not in playlist - add and play
+                val newList = currentList.toMutableList()
+                newList.add(music)
+                _playlist.value = newList
+                _currentIndex.value = newList.size - 1
+                playMusic(music)
+
+                // Update the last operation
+                _lastPlaylistOperation.value = PlaylistOperation.ADD(music)
+                _playlistModified.value = true
+            }
+        }
+    }
+
+    // Add this method to load a playlist by name
+    fun loadPlaylist(playlistName: String, mainViewModel: MainViewModel, startIndex: Int = 0) {
+        viewModelScope.launch {
+            val playlist = mainViewModel.getSavedPlaylist(playlistName)
+            if (playlist != null && playlist.isNotEmpty()) {
+                setPlaylist(playlist, startIndex)
+            }
+        }
+    }
+
+    // Add this method to handle playlist continuity
+    fun handlePlaybackCompletion() {
+        viewModelScope.launch {
+            // When track completes, play the next one
+            skipToNext()
+
+            // Also save playlist state
+            persistPlaylist()
+        }
+    }
+
+    // Add this method to check if a track is in any playlists
+    fun findPlaylistsContainingTrack(mainViewModel: MainViewModel, trackId: String): List<String> {
+        val result = mutableListOf<String>()
+
+        viewModelScope.launch {
+            val playlists = mainViewModel.savedPlaylists.value
+
+            // For each playlist, check if it contains the track
+            for (playlistName in playlists) {
+                val playlist = mainViewModel.getSavedPlaylist(playlistName)
+                if (playlist?.any { it.id == trackId } == true) {
+                    result.add(playlistName)
+                }
+            }
+        }
+
+        return result
+    }
+
+    // Add this method to create a new playlist with the current track
+    fun createNewPlaylist(name: String, music: Music, mainViewModel: MainViewModel) {
+        viewModelScope.launch {
+            // Create a new playlist with just this track
+            val playlist = listOf(music)
+            mainViewModel.saveCurrentPlaylist(name, playlist)
+
+            // Set as current playlist
+            setPlaylist(playlist, 0)
+
+            // Record this operation
+            _lastPlaylistOperation.value = PlaylistOperation.ADD(music)
+            _playlistModified.value = true
+        }
+    }
+
+
 
     override fun onCleared() {
         if (bound) {

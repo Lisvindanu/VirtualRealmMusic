@@ -97,6 +97,9 @@ class YouTubeAudioPlayer @Inject constructor(
                                     url?.contains("youtu.be") == true) {
                                     // Inject JS untuk menyembunyikan video dan hanya mendengarkan audio
                                     injectAudioOnlyJS()
+
+                                    // Also inject event detection to better handle navigation
+                                    injectAudioEndDetectionJS()
                                 }
                             }
                         }
@@ -113,6 +116,33 @@ class YouTubeAudioPlayer @Inject constructor(
         }
     }
 
+    // Add the audio end detection method
+    private fun injectAudioEndDetectionJS() {
+        val js = """
+        // Make sure video end detection works properly
+        var videos = document.getElementsByTagName('video');
+        for(var i=0; i<videos.length; i++) {
+            // Remove any existing event listeners to avoid duplicates
+            const video = videos[i];
+            const oldEndHandler = video._endHandler;
+            if (oldEndHandler) {
+                video.removeEventListener('ended', oldEndHandler);
+            }
+            
+            // Add new event listener and store reference
+            const newEndHandler = function() {
+                AndroidAudioPlayer.onCompletion();
+                console.log("Video ended - notifying Android");
+            };
+            video._endHandler = newEndHandler;
+            video.addEventListener('ended', newEndHandler);
+            
+            console.log("Added end detection to video element");
+        }
+    """
+        webView?.evaluateJavascript(js, null)
+    }
+
     fun loadAndPlayYouTube(videoId: String) {
         if (webView == null) {
             initialize()
@@ -123,23 +153,71 @@ class YouTubeAudioPlayer @Inject constructor(
 
         mainHandler.post {
             try {
-                // Direct YouTube embed dengan autoplay dan kontrol API
-                val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&enablejsapi=1&controls=0&disablekb=1"
+                // Improved embed URL with additional options for more reliable playback
+                val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&enablejsapi=1&controls=0&disablekb=1&loop=0&modestbranding=1&rel=0&showinfo=0"
                 Log.d("YouTubeAudioPlayer", "Loading URL: $embedUrl")
                 webView?.loadUrl(embedUrl)
 
-                // Delay untuk memastikan video telah dimuat
+                // Delay for loading with callbacks for completion
+                var checkingLoaded = true
+                val loadingChecker = object : Runnable {
+                    override fun run() {
+                        if (checkingLoaded) {
+                            // Check if video element exists and is playing
+                            val js = """
+                            var videos = document.getElementsByTagName('video');
+                            if(videos.length > 0) {
+                                var video = videos[0];
+                                if (!video.paused && video.currentTime > 0) {
+                                    true;
+                                } else {
+                                    false;
+                                }
+                            } else {
+                                false;
+                            }
+                        """
+
+                            webView?.evaluateJavascript(js) { result ->
+                                if (result.contains("true")) {
+                                    // Video is loaded and playing
+                                    _isPlaying.value = true
+                                    _isLoading.value = false
+                                    checkingLoaded = false
+                                    onPrepared?.invoke()
+
+                                    // Inject end detection again to be safe
+                                    injectAudioEndDetectionJS()
+
+                                    // Start position updates
+                                    startPositionUpdates()
+
+                                    // Get duration
+                                    getDuration()
+                                } else {
+                                    // Check again after a short delay
+                                    mainHandler.postDelayed(this, 500)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Start the loading checker
+                mainHandler.postDelayed(loadingChecker, 1500)
+
+                // Set a timeout in case loading takes too long
                 mainHandler.postDelayed({
-                    _isPlaying.value = true
-                    _isLoading.value = false
-                    onPrepared?.invoke()
-
-                    // Setup update posisi berkala
-                    startPositionUpdates()
-
-                    // Requests video duration after a delay
-                    getDuration()
-                }, 3000) // Wait longer for loading
+                    if (checkingLoaded) {
+                        checkingLoaded = false
+                        _isLoading.value = false
+                        if (_isPlaying.value == false) {
+                            // Still not playing after timeout - trigger prepared anyway
+                            _isPlaying.value = true
+                            onPrepared?.invoke()
+                        }
+                    }
+                }, 8000) // 8 second timeout
             } catch (e: Exception) {
                 Log.e("YouTubeAudioPlayer", "Error loading YouTube video: ${e.message}")
                 _isLoading.value = false

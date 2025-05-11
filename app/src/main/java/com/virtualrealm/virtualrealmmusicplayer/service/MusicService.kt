@@ -256,33 +256,100 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
         }
     }
 
+    // Additional helper function to ensure smoother transitions
     private fun playMusicFromPlaylist(index: Int) {
         if (index >= 0 && index < _playlist.value.size) {
             _currentIndex.value = index
-            playMusic(_playlist.value[index])
+            val music = _playlist.value[index]
+
+            // Log which track is being played
+            Log.d(TAG, "Playing from playlist: ${music.title} (${music.id}), type: ${
+                when(music) {
+                    is Music.SpotifyTrack -> "Spotify"
+                    is Music.YoutubeVideo -> "YouTube"
+                }
+            }")
+
+            playMusic(music)
+        } else {
+            Log.e(TAG, "Invalid playlist index: $index (playlist size: ${_playlist.value.size})")
         }
     }
+
     fun skipToNext() {
         if (_playlist.value.isNotEmpty()) {
-            // Increment index and keep it within bounds
-            val nextIndex = (_currentIndex.value + 1) % _playlist.value.size
-            playMusicFromPlaylist(nextIndex)
+            try {
+                // Increment index and keep it within bounds
+                val nextIndex = (_currentIndex.value + 1) % _playlist.value.size
+
+                // Log transition
+                Log.d(TAG, "Skipping to next track: index $nextIndex of ${_playlist.value.size}")
+
+                // Stop current playback
+                when {
+                    currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                        spotifyWebPlayerHelper.pause()
+                    }
+                    currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotify://") == true -> {
+                        spotifyPlayerManager.pause()
+                    }
+                    currentMusic is Music.YoutubeVideo && currentAudioUrl?.startsWith("youtube://") == true -> {
+                        youTubeAudioPlayer.pause()
+                    }
+                    else -> {
+                        mediaPlayer?.pause()
+                    }
+                }
+
+                // Play the next track
+                playMusicFromPlaylist(nextIndex)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error skipping to next track: ${e.message}", e)
+                // If error, try to continue with current track
+                _currentIndex.value.let { playMusicFromPlaylist(it) }
+            }
         } else if (currentMusic != null) {
             // If there's a current track but no playlist, restart the current track
             currentMusic?.let { playMusic(it) }
         }
     }
 
-
     fun skipToPrevious() {
         if (_playlist.value.isNotEmpty()) {
-            // Decrement index and keep it within bounds (wrap around to end)
-            val prevIndex = if (_currentIndex.value > 0) {
-                _currentIndex.value - 1
-            } else {
-                _playlist.value.size - 1  // Go to the last track if we're at the first one
+            try {
+                // Decrement index and keep it within bounds (wrap around to end)
+                val prevIndex = if (_currentIndex.value > 0) {
+                    _currentIndex.value - 1
+                } else {
+                    _playlist.value.size - 1  // Go to the last track if we're at the first one
+                }
+
+                // Log transition
+                Log.d(TAG, "Skipping to previous track: index $prevIndex of ${_playlist.value.size}")
+
+                // Stop current playback
+                when {
+                    currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotifyweb://") == true -> {
+                        spotifyWebPlayerHelper.pause()
+                    }
+                    currentMusic is Music.SpotifyTrack && currentAudioUrl?.startsWith("spotify://") == true -> {
+                        spotifyPlayerManager.pause()
+                    }
+                    currentMusic is Music.YoutubeVideo && currentAudioUrl?.startsWith("youtube://") == true -> {
+                        youTubeAudioPlayer.pause()
+                    }
+                    else -> {
+                        mediaPlayer?.pause()
+                    }
+                }
+
+                // Play the previous track
+                playMusicFromPlaylist(prevIndex)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error skipping to previous track: ${e.message}", e)
+                // If error, try to continue with current track
+                _currentIndex.value.let { playMusicFromPlaylist(it) }
             }
-            playMusicFromPlaylist(prevIndex)
         } else if (currentMusic != null) {
             // If there's a current track but no playlist, restart the current track
             currentMusic?.let { playMusic(it) }
