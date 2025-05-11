@@ -107,6 +107,7 @@ fun PlayerScreen(
         }
     }
 
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
@@ -117,7 +118,9 @@ fun PlayerScreen(
             )
         },
         floatingActionButton = {
-            if (playlist.size > 1 || !music?.let { musicViewModel.isTrackInPlaylist(it) }!!) {
+            // Fix the null-safety issue by using a proper null check
+            val currentMusic = music
+            if (playlist.size > 1 || (currentMusic != null && !musicViewModel.isTrackInPlaylist(currentMusic))) {
                 PlayerFloatingButton(
                     playlistSize = playlist.size,
                     isExpanded = isPlaylistButtonExpanded,
