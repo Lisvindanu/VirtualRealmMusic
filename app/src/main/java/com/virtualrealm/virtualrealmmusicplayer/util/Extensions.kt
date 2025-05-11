@@ -13,6 +13,7 @@ import androidx.lifecycle.Observer
 import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Resource
+import com.virtualrealm.virtualrealmmusicplayer.ui.player.MusicViewModel
 
 fun Context.showToast(message: String, duration: Int = Toast.LENGTH_SHORT) {
     Toast.makeText(this, message, duration).show()
@@ -53,3 +54,25 @@ fun <T> LiveData<T>.observeOnce(lifecycleOwner: LifecycleOwner, observer: Observ
         }
     })
 }
+
+/**
+ * Extension function to handle adding music to playlist when starting playback
+ */
+fun MusicViewModel.playMusicAndAddToPlaylist(music: Music) {
+    // First play the music
+    playMusic(music)
+
+    // Then add it to playlist if it's not already there
+    val currentPlaylist = playlist.value
+    if (!currentPlaylist.any { it.id == music.id }) {
+        addToPlaylist(music)
+    }
+}
+
+/**
+ * Extension function to check if a music is in the current playlist
+ */
+fun MusicViewModel.isInPlaylist(musicId: String): Boolean {
+    return playlist.value.any { it.id == musicId }
+}
+

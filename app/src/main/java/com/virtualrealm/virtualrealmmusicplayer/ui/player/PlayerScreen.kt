@@ -2,6 +2,7 @@
 
 package com.virtualrealm.virtualrealmmusicplayer.ui.player
 
+import android.util.Log
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,28 +15,50 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.NavigateBefore
+import androidx.compose.material.icons.filled.NavigateNext
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +72,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.viewModelScope
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.virtualrealm.virtualrealmmusicplayer.R
@@ -59,8 +83,6 @@ import com.virtualrealm.virtualrealmmusicplayer.ui.theme.SpotifyGreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.YouTubeRed
 import com.virtualrealm.virtualrealmmusicplayer.util.Constants
 import com.virtualrealm.virtualrealmmusicplayer.util.DateTimeUtils
-import android.util.Log
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -81,21 +103,54 @@ fun PlayerScreen(
 
     val isPlaying by musicViewModel.isPlaying.collectAsState()
     val currentTrack by musicViewModel.currentTrack.collectAsState()
+    val playlist by musicViewModel.playlist.collectAsState()
+    val currentIndex by musicViewModel.currentIndex.collectAsState()
+
+    // Playlist snackbar state
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val playlistModified by musicViewModel.playlistModified.collectAsState()
+    val lastPlaylistOperation by musicViewModel.lastPlaylistOperation.collectAsState()
+
+    // Handle playlist operation feedback
+    LaunchedEffect(lastPlaylistOperation) {
+        lastPlaylistOperation?.let { operation ->
+            when (operation) {
+                is MusicViewModel.PlaylistOperation.ADD -> {
+                    snackbarHostState.showSnackbar(
+                        message = "Added to playlist",
+                        duration = SnackbarDuration.Short
+                    )
+                }
+                is MusicViewModel.PlaylistOperation.REMOVE -> {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "Removed from playlist",
+                        actionLabel = "UNDO",
+                        duration = SnackbarDuration.Short
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        musicViewModel.undoLastPlaylistOperation()
+                    }
+                }
+                else -> { /* No feedback needed for other operations */ }
+            }
+
+            // Acknowledge the operation
+            musicViewModel.acknowledgePlaylistModification()
+        }
+    }
 
     // Track position state
     var sliderPosition by remember { mutableStateOf(0f) }
     var trackDuration by remember { mutableStateOf(0L) }
     var isUserSeeking by remember { mutableStateOf(false) }
 
-
-// Collect current position and duration
+    // Collect current position and duration
     LaunchedEffect(isPlaying, currentTrack) {
         while(true) {
             if (currentTrack != null) {
                 val position = musicViewModel.getCurrentPosition()
                 val duration = musicViewModel.getDuration()
-
-                Log.d("PlayerScreen", "Position: $position ms, Duration: $duration ms")
 
                 if (duration > 0) {
                     trackDuration = duration
@@ -109,21 +164,38 @@ fun PlayerScreen(
         }
     }
 
+    // Add current track to playlist when loaded
+    LaunchedEffect(music) {
+        music?.let {
+            // Check if track is in playlist
+            if (!musicViewModel.isTrackInPlaylist(it)) {
+                // Add to playlist if not already playing from playlist
+                musicViewModel.addToPlaylist(it)
+            } else {
+                // If already in playlist, make sure it's the current playing track
+                val position = musicViewModel.getPlaylistPosition(it.id)
+                if (position != null && position != currentIndex) {
+                    // Set as current track in playlist
+                    musicViewModel.setPlaylist(playlist, position)
+                }
+            }
+        }
+    }
+
     // Load the music when the screen is first composed
     LaunchedEffect(musicId, musicType) {
-        Log.d("PlayerScreen", "Loading music: $musicId, type: $musicType")
         playerViewModel.loadMusic(musicId, musicType)
     }
 
     // Start playback when music is loaded
     LaunchedEffect(music) {
         music?.let {
-            Log.d("PlayerScreen", "Starting playback for: ${it.title}")
             musicViewModel.playMusic(it)
         }
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text(text = stringResource(R.string.now_playing)) },
@@ -136,11 +208,40 @@ fun PlayerScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onNavigateToPlaylist) {
-                        Icon(
-                            imageVector = Icons.Default.PlaylistPlay,
-                            contentDescription = "View Playlist"
-                        )
+                    // Add tooltip to show playlist status
+                    val playlistSize = playlist.size
+
+                    Box {
+                        IconButton(
+                            onClick = onNavigateToPlaylist
+                        ) {
+                            BadgedBox(
+                                badge = {
+                                    if (playlistSize > 0) {
+                                        Badge { Text("$playlistSize") }
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlaylistPlay,
+                                    contentDescription = "View Playlist"
+                                )
+                            }
+                        }
+
+                        if (playlistSize > 0) {
+                            TooltipBox(
+                                positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+                                tooltip = {
+                                    PlainTooltip {
+                                        Text("${currentIndex + 1} of $playlistSize in playlist")
+                                    }
+                                },
+                                state = rememberTooltipState()
+                            ) {
+                                Box(Modifier.size(48.dp))
+                            }
+                        }
                     }
                 }
             )
@@ -194,7 +295,10 @@ fun PlayerScreen(
                         },
                         currentPosition = sliderPosition,
                         duration = trackDuration,
-                        musicType = musicType
+                        musicType = musicType,
+                        playlist = playlist,
+                        currentIndex = currentIndex,
+                        onNavigateToPlaylist = onNavigateToPlaylist
                     )
                 }
             }
@@ -214,24 +318,26 @@ fun PlayerContent(
     onSeekTo: (Float) -> Unit,
     currentPosition: Float,
     duration: Long,
-    musicType: String
+    musicType: String,
+    playlist: List<Music>,
+    currentIndex: Int,
+    onNavigateToPlaylist: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        // Album art section (60% of the screen height)
+        // Album art section
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.5f) // Slightly reduce to make room for the slider
+                .weight(0.5f)
                 .padding(bottom = 16.dp)
         ) {
             if (musicType == Constants.MUSIC_TYPE_YOUTUBE) {
                 // YouTube video thumbnail
                 val thumbnailUrl = "https://img.youtube.com/vi/${music.id}/hqdefault.jpg"
-                Log.d("PlayerScreen", "Loading YouTube thumbnail: $thumbnailUrl")
 
                 AsyncImage(
                     model = ImageRequest.Builder(LocalContext.current)
@@ -334,7 +440,7 @@ fun PlayerContent(
             }
         }
 
-        // Music info section (40% of the screen height)
+        // Music info section
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -451,13 +557,15 @@ fun PlayerContent(
             ) {
                 IconButton(
                     onClick = onSkipPrevious,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(48.dp),
+                    enabled = playlist.size > 1
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_previous),
                         contentDescription = "Previous",
                         modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (playlist.size > 1) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
                 }
 
@@ -477,15 +585,43 @@ fun PlayerContent(
 
                 IconButton(
                     onClick = onSkipNext,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(48.dp),
+                    enabled = playlist.size > 1
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_next),
                         contentDescription = "Next",
                         modifier = Modifier.size(32.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = if (playlist.size > 1) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
                     )
                 }
+            }
+
+            // Add advanced playlist navigator
+            if (playlist.isNotEmpty() && playlist.size > 1) {
+                // Use the PlaylistNavigator component
+                PlaylistNavigator(
+                    playlist = playlist,
+                    currentIndex = currentIndex,
+                    onPreviousClick = onSkipPrevious,
+                    onNextClick = onSkipNext,
+                    onViewPlaylistClick = onNavigateToPlaylist,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            } else {
+                // If no playlist or only one track, show the mini navigator
+                MiniPlaylistNavigator(
+                    playlist = playlist,
+                    currentIndex = currentIndex,
+                    onNavigate = { index ->
+                        if (playlist.isNotEmpty()) {
+                            // TODO: Implement this in MusicViewModel
+                        }
+                    },
+                    onViewPlaylistClick = onNavigateToPlaylist,
+                    modifier = Modifier.padding(vertical = 8.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(16.dp))
