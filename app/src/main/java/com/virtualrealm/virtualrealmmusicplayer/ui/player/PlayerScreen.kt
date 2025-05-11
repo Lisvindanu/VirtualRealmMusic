@@ -15,39 +15,40 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
-import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.NavigateBefore
-import androidx.compose.material.icons.filled.NavigateNext
 import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.PlaylistPlay
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -55,7 +56,6 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -88,6 +88,7 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.ErrorState
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.SourceTag
 import com.virtualrealm.virtualrealmmusicplayer.ui.main.MainViewModel
+import com.virtualrealm.virtualrealmmusicplayer.ui.playlist.SavePlaylistDialog
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.SpotifyGreen
 import com.virtualrealm.virtualrealmmusicplayer.ui.theme.YouTubeRed
 import com.virtualrealm.virtualrealmmusicplayer.util.Constants
@@ -886,264 +887,5 @@ fun PlaylistNavigator(
                 } ?: Spacer(modifier = Modifier.weight(1f))
             }
         }
-    }
-}
-
-@Composable
-fun MiniPlaylistNavigator(
-    playlist: List<Music>,
-    currentIndex: Int,
-    onNavigate: (Int) -> Unit,
-    onViewPlaylistClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (playlist.isEmpty()) return
-
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // Current track info with navigation arrows
-        Box(
-            modifier = Modifier
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                .clickable(onClick = onViewPlaylistClick)
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
-            ) {
-                // Previous button
-                if (playlist.size > 1) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowLeft,
-                        contentDescription = "Previous Track",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable {
-                                val newIndex = if (currentIndex > 0) {
-                                    currentIndex - 1
-                                } else {
-                                    playlist.size - 1
-                                }
-                                onNavigate(newIndex)
-                            }
-                            .padding(4.dp)
-                    )
-                }
-
-                // Track position
-                AnimatedVisibility(
-                    targetState = currentIndex,
-                    enter = slideInHorizontally { width -> width } + fadeIn(),
-                    exit = slideOutHorizontally { width -> -width } + fadeOut()
-                ) { index ->
-                    Text(
-                        text = "${index + 1}/${playlist.size}",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 8.dp)
-                    )
-                }
-
-                // Next button
-                if (playlist.size > 1) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowRight,
-                        contentDescription = "Next Track",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .clickable {
-                                val newIndex = if (currentIndex < playlist.size - 1) {
-                                    currentIndex + 1
-                                } else {
-                                    0
-                                }
-                                onNavigate(newIndex)
-                            }
-                            .padding(4.dp)
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun PlaylistFloatingButton(
-    playlistSize: Int,
-    isExpanded: Boolean,
-    onExpandClick: () -> Unit,
-    onViewPlaylistClick: () -> Unit,
-    onAddToPlaylistClick: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .padding(16.dp)
-    ) {
-        AnimatedVisibility(
-            visible = isExpanded,
-            enter = slideInHorizontally() + fadeIn(),
-            exit = slideOutHorizontally() + fadeOut()
-        ) {
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // View Playlist Button
-                Row(
-                    modifier = Modifier
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(onClick = onViewPlaylistClick)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlaylistPlay,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-
-                    Text(
-                        text = "View Playlist ($playlistSize)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-
-                // Add to Playlist Button
-                Row(
-                    modifier = Modifier
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer)
-                        .clickable(onClick = onAddToPlaylistClick)
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlaylistAdd,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-
-                    Text(
-                        text = "Add to Playlist",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    )
-                }
-            }
-        }
-
-        FloatingActionButton(
-            onClick = onExpandClick,
-            modifier = Modifier
-                .align(if (isExpanded) Alignment.BottomEnd else Alignment.Center)
-                .size(56.dp),
-            containerColor = MaterialTheme.colorScheme.primary
-        ) {
-            Icon(
-                imageVector = if (isExpanded) Icons.Default.Close else Icons.Default.PlaylistPlay,
-                contentDescription = if (isExpanded) "Hide playlist options" else "Show playlist options",
-                tint = MaterialTheme.colorScheme.onPrimary
-            )
-        }
-    }
-}
-
-@Composable
-fun AddToPlaylistDialog(
-    track: Music,
-    availablePlaylists: List<String>,
-    onDismiss: () -> Unit,
-    onAddToExisting: (String) -> Unit,
-    onCreateNew: (String) -> Unit
-) {
-    var showNewPlaylistDialog by remember { mutableStateOf(false) }
-
-    if (showNewPlaylistDialog) {
-        SavePlaylistDialog(
-            existingPlaylists = availablePlaylists,
-            onDismiss = { showNewPlaylistDialog = false },
-            onSave = { name ->
-                onCreateNew(name)
-                showNewPlaylistDialog = false
-                onDismiss()
-            }
-        )
-    } else {
-        AlertDialog(
-            onDismissRequest = onDismiss,
-            title = { Text("Add to Playlist") },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 300.dp)
-                ) {
-                    Text(
-                        text = "Add \"${track.title}\" to a playlist:",
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-
-                    if (availablePlaylists.isEmpty()) {
-                        Text(
-                            text = "No playlists found. Create a new one.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                            modifier = Modifier.padding(vertical = 16.dp)
-                        )
-                    } else {
-                        LazyColumn {
-                            items(availablePlaylists) { name ->
-                                ListItem(
-                                    headlineText = { Text(name) },
-                                    leadingContent = {
-                                        Icon(
-                                            imageVector = Icons.Default.PlaylistPlay,
-                                            contentDescription = null
-                                        )
-                                    },
-                                    modifier = Modifier.clickable {
-                                        onAddToExisting(name)
-                                        onDismiss()
-                                    }
-                                )
-                                Divider()
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showNewPlaylistDialog = true
-                    }
-                ) {
-                    Text("Create New")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = onDismiss) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
