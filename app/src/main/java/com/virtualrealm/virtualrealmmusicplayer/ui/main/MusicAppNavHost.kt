@@ -65,7 +65,7 @@ fun MusicAppNavHost(
             if (showBottomNav) {
                 AnimatedNavigationBar(
                     modifier = Modifier.height(64.dp),
-                    selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute },
+                    selectedIndex = bottomNavItems.indexOfFirst { it.route == currentRoute }.takeIf { it >= 0 } ?: 0,
                     cornerRadius = shapeCornerRadius(0.dp),
                     ballAnimation = Parabolic(tween(300)),
                     indentAnimation = Height(tween(300)),

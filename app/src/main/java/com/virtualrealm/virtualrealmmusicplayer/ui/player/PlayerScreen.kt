@@ -117,7 +117,7 @@ fun PlayerScreen(
             )
         },
         floatingActionButton = {
-            if (playlist.size > 1 || !musicViewModel.isTrackInPlaylist(music)) {
+            if (playlist.size > 1 || !music?.let { musicViewModel.isTrackInPlaylist(it) }!!) {
                 PlayerFloatingButton(
                     playlistSize = playlist.size,
                     isExpanded = isPlaylistButtonExpanded,

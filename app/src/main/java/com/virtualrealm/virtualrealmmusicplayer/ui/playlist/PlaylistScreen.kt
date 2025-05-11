@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -40,6 +41,7 @@ import com.virtualrealm.virtualrealmmusicplayer.util.getMusicType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.lazy.rememberLazyListState
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -370,7 +372,7 @@ private fun PlaylistContent(
     currentIndex: Int,
     isPlaying: Boolean,
     animationsEnabled: MutableState<Boolean>,
-    lazyListState: LazyColumnState,
+    lazyListState: LazyListState,
     onItemClick: (Int, Music) -> Unit,
     onRemoveItem: (Int) -> Unit,
     onMoveUp: (Int) -> Unit,

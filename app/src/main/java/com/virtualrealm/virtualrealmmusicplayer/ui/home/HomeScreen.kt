@@ -17,6 +17,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -48,6 +49,7 @@ import com.virtualrealm.virtualrealmmusicplayer.util.getMusicType
 fun HomeScreen(
     onNavigateToPlayer: (String, String) -> Unit,
     onNavigateToSearch: () -> Unit,
+    onNavigateToPlaylist: () -> Unit, // Added this parameter
     onLogout: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
@@ -60,6 +62,14 @@ fun HomeScreen(
             TopAppBar(
                 title = { Text(text = stringResource(R.string.home)) },
                 actions = {
+                    // Add playlist button
+                    IconButton(onClick = onNavigateToPlaylist) {
+                        Icon(
+                            imageVector = Icons.Default.PlaylistPlay,
+                            contentDescription = stringResource(id = R.string.view_playlist)
+                        )
+                    }
+                    // Logout button
                     IconButton(onClick = { viewModel.logout() }) {
                         Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = stringResource(R.string.logout))
                     }

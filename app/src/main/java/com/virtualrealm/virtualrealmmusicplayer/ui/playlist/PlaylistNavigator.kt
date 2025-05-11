@@ -1,9 +1,8 @@
-// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/player/PlaylistNavigator.kt
+// app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/playlist/PlaylistNavigator.kt
 
-package com.virtualrealm.virtualrealmmusicplayer.ui.player
+package com.virtualrealm.virtualrealmmusicplayer.ui.playlist
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
