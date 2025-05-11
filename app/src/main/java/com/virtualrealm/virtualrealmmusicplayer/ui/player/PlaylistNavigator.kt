@@ -17,8 +17,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 
+/**
+ * A composable that displays navigation controls for a playlist
+ *
+ * NOTE: Function name changed from PlaylistNavigator to TrackNavigationControls
+ * to avoid conflicts with another function with the same name in the codebase
+ */
 @Composable
-fun PlaylistNavigator(
+fun TrackNavigationControls(
     playlist: List<Music>,
     currentIndex: Int,
     onPreviousClick: () -> Unit,
@@ -106,82 +112,124 @@ fun PlaylistNavigator(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Previous track preview
-                prevTrack?.let { track ->
-                    TrackPreview(
-                        track = track,
-                        isNext = false,
-                        onClick = onPreviousClick
+                if (prevTrack != null) {
+                    PrevTrackPreview(
+                        track = prevTrack,
+                        onClick = onPreviousClick,
+                        modifier = Modifier.weight(1f)
                     )
-                } ?: Spacer(modifier = Modifier.weight(1f))
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
 
                 // Spacer in the middle
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Next track preview
-                nextTrack?.let { track ->
-                    TrackPreview(
-                        track = track,
-                        isNext = true,
-                        onClick = onNextClick
+                if (nextTrack != null) {
+                    NextTrackPreview(
+                        track = nextTrack,
+                        onClick = onNextClick,
+                        modifier = Modifier.weight(1f)
                     )
-                } ?: Spacer(modifier = Modifier.weight(1f))
+                } else {
+                    Spacer(modifier = Modifier.weight(1f))
+                }
             }
         }
     }
 }
 
+/**
+ * Preview for the previous track
+ */
 @Composable
-fun TrackPreview(
+private fun PrevTrackPreview(
     track: Music,
-    isNext: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Row(
-        modifier = Modifier
-            .weight(1f)
+        modifier = modifier
             .clip(MaterialTheme.shapes.small)
             .clickable(onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (isNext) Arrangement.End else Arrangement.Start
+        horizontalArrangement = Arrangement.Start
     ) {
-        if (!isNext) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowLeft,
-                contentDescription = "Previous",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-        }
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowLeft,
+            contentDescription = "Previous",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
 
         Column(
             modifier = Modifier
                 .padding(horizontal = 4.dp)
                 .weight(1f),
-            horizontalAlignment = if (isNext) Alignment.End else Alignment.Start
+            horizontalAlignment = Alignment.Start
         ) {
             Text(
-                text = if (isNext) "Next" else "Previous",
+                text = "Previous",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.primary,
-                textAlign = if (isNext) TextAlign.End else TextAlign.Start
+                textAlign = TextAlign.Start
             )
             Text(
                 text = track.title,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                textAlign = if (isNext) TextAlign.End else TextAlign.Start
+                textAlign = TextAlign.Start
+            )
+        }
+    }
+}
+
+/**
+ * Preview for the next track
+ */
+@Composable
+private fun NextTrackPreview(
+    track: Music,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(MaterialTheme.shapes.small)
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(horizontal = 4.dp)
+                .weight(1f),
+            horizontalAlignment = Alignment.End
+        ) {
+            Text(
+                text = "Next",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.primary,
+                textAlign = TextAlign.End
+            )
+            Text(
+                text = track.title,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End
             )
         }
 
-        if (isNext) {
-            Icon(
-                imageVector = Icons.Default.KeyboardArrowRight,
-                contentDescription = "Next",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-        }
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowRight,
+            contentDescription = "Next",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
     }
 }
