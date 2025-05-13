@@ -1,4 +1,3 @@
-// File: app/src/main/java/com/virtualrealm/virtualrealmmusicplayer/ui/search/SearchViewModel.kt
 package com.virtualrealm.virtualrealmmusicplayer.ui.search
 
 import androidx.lifecycle.ViewModel
@@ -33,6 +32,11 @@ class SearchViewModel @Inject constructor(
     private val _currentQuery = MutableStateFlow("")
     val currentQuery: StateFlow<String> = _currentQuery.asStateFlow()
 
+    private val _uiEvent = MutableSharedFlow<UiEvent>()
+    val uiEvent: SharedFlow<UiEvent> = _uiEvent.asSharedFlow()
+
+
+
     init {
         viewModelScope.launch {
             getAuthStateUseCase().collect {
@@ -59,6 +63,9 @@ class SearchViewModel @Inject constructor(
             _searchResults.value = Resource.Loading
             searchMusicUseCase(query, _selectedSource.value).collectLatest { result ->
                 _searchResults.value = result
+                if (result is Resource.Error) {
+                    _uiEvent.emit(UiEvent.ShowSnackbar(result.message ?: "Something went wrong"))
+                }
             }
         }
     }
@@ -66,6 +73,8 @@ class SearchViewModel @Inject constructor(
     fun toggleFavorite(music: Music) {
         viewModelScope.launch {
             toggleFavoriteUseCase(music)
+            _uiEvent.emit(UiEvent.ShowSnackbar("Added to favorites successfully!"))
         }
     }
+
 }

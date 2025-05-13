@@ -43,6 +43,15 @@ import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.EmptyState
 import com.virtualrealm.virtualrealmmusicplayer.ui.common.MusicItem
 import com.virtualrealm.virtualrealmmusicplayer.util.getMusicType
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
+
+import androidx.compose.ui.unit.dp
+
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -97,35 +106,57 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 // Auth status
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = if (authState?.isAuthenticated == true) {
-                                stringResource(R.string.spotify_connected)
-                            } else {
-                                stringResource(R.string.spotify_not_connected)
-                            },
-                            style = MaterialTheme.typography.titleMedium
-                        )
-
-                        if (authState?.isAuthenticated != true) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Button(
-                                onClick = onLogout // This will navigate to login screen
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
                             ) {
-                                Text(text = stringResource(R.string.connect_spotify))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = if (authState?.isAuthenticated == true) {
+                                            Icons.Default.CheckCircle
+                                        } else {
+                                            Icons.Default.Warning
+                                        },
+                                        contentDescription = null,
+                                        tint = if (authState?.isAuthenticated == true) {
+                                            Color(0xFF1DB954) // Spotify green 💚
+                                        } else {
+                                            MaterialTheme.colorScheme.error
+                                        },
+                                        modifier = Modifier
+                                            .size(20.dp)
+                                            .padding(end = 8.dp)
+                                    )
+
+                                    Text(
+                                        text = if (authState?.isAuthenticated == true) {
+                                            stringResource(R.string.spotify_connected)
+                                        } else {
+                                            stringResource(R.string.spotify_not_connected)
+                                        },
+                                        style = MaterialTheme.typography.titleMedium
+                                    )
+                                }
+
+                                if (authState?.isAuthenticated != true) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Button(
+                                        onClick = onLogout // This will navigate to login screen
+                                    ) {
+                                        Text(text = stringResource(R.string.connect_spotify))
+                                    }
+                                }
                             }
                         }
-                    }
-                }
+
 
                 // Favorites
                 if (favorites.isEmpty()) {
