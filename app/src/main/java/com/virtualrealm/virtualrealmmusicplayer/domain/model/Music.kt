@@ -1,8 +1,8 @@
-
 // domain/model/Music.kt
 package com.virtualrealm.virtualrealmmusicplayer.domain.model
 
 import android.os.Parcelable
+import com.google.gson.annotations.SerializedName
 import kotlinx.parcelize.Parcelize
 
 sealed class Music : Parcelable {
@@ -10,6 +10,9 @@ sealed class Music : Parcelable {
     abstract val title: String
     abstract val artists: String
     abstract val thumbnailUrl: String
+
+    // Add a type field for Gson serialization
+    abstract val musicType: String
 
     @Parcelize
     data class SpotifyTrack(
@@ -20,7 +23,10 @@ sealed class Music : Parcelable {
         val albumName: String,
         val uri: String,
         val durationMs: Long
-    ) : Music()
+    ) : Music() {
+        @SerializedName("musicType")
+        override val musicType: String = "spotify"
+    }
 
     @Parcelize
     data class YoutubeVideo(
@@ -29,5 +35,8 @@ sealed class Music : Parcelable {
         override val artists: String,
         override val thumbnailUrl: String,
         val channelTitle: String
-    ) : Music()
+    ) : Music() {
+        @SerializedName("musicType")
+        override val musicType: String = "youtube"
+    }
 }

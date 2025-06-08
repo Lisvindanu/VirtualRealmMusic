@@ -8,6 +8,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
 import com.google.gson.reflect.TypeToken
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -18,7 +19,6 @@ import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.io.IOException
-
 
 /**
  * A utility class to manage playlist persistence across app sessions
@@ -94,11 +94,11 @@ class PlaylistManager @Inject constructor(
                 }
 
                 try {
-                    // Parse the playlist from JSON
+                    // Parse the playlist from JSON with error handling
                     val type = object : TypeToken<ArrayList<Music>>() {}.type
                     val playlist: List<Music> = gson.fromJson(playlistJson, type) ?: emptyList()
 
-                    // Perbaikan: Pastikan index tidak melewati batas
+                    // Ensure index is within bounds
                     val safeIndex = if (playlist.isNotEmpty()) {
                         lastIndex.coerceIn(0, playlist.lastIndex)
                     } else {
@@ -111,6 +111,17 @@ class PlaylistManager @Inject constructor(
                         positionMs = lastPosition,
                         lastPlayedId = lastPlayedId
                     )
+                } catch (e: JsonSyntaxException) {
+                    Log.e("PlaylistManager", "Error parsing playlist JSON - clearing corrupted data: ${e.message}")
+                    // Clear corrupted data
+                    try {
+                        context.playlistDataStore.edit { prefs ->
+                            prefs.remove(CURRENT_PLAYLIST)
+                        }
+                    } catch (clearException: Exception) {
+                        Log.e("PlaylistManager", "Error clearing corrupted data: ${clearException.message}")
+                    }
+                    PlaylistState(emptyList(), 0, 0)
                 } catch (e: Exception) {
                     Log.e("PlaylistManager", "Error parsing playlist: ${e.message}", e)
                     PlaylistState(emptyList(), 0, 0)
@@ -154,6 +165,17 @@ class PlaylistManager @Inject constructor(
 
             val type = object : TypeToken<MutableMap<String, ArrayList<Music>>>() {}.type
             gson.fromJson(playlistsJson, type) ?: mutableMapOf()
+        } catch (e: JsonSyntaxException) {
+            Log.e("PlaylistManager", "Error parsing saved playlists JSON - clearing corrupted data: ${e.message}")
+            // Clear corrupted data
+            try {
+                context.playlistDataStore.edit { prefs ->
+                    prefs.remove(SAVED_PLAYLISTS)
+                }
+            } catch (clearException: Exception) {
+                Log.e("PlaylistManager", "Error clearing corrupted saved playlists: ${clearException.message}")
+            }
+            mutableMapOf()
         } catch (e: Exception) {
             Log.e("PlaylistManager", "Error getting saved playlists: ${e.message}", e)
             mutableMapOf()
@@ -182,8 +204,19 @@ class PlaylistManager @Inject constructor(
 
                 try {
                     val type = object : TypeToken<Map<String, List<Music>>>() {}.type
-                    val playlists: Map<String, List<Music>> = gson.fromJson(playlistsJson, type)
+                    val playlists: Map<String, List<Music>> = gson.fromJson(playlistsJson, type) ?: emptyMap()
                     playlists.keys.toList().sorted()
+                } catch (e: JsonSyntaxException) {
+                    Log.e("PlaylistManager", "Error parsing playlist names JSON - clearing corrupted data: ${e.message}")
+                    // Clear corrupted data
+                    try {
+                        context.playlistDataStore.edit { prefs ->
+                            prefs.remove(SAVED_PLAYLISTS)
+                        }
+                    } catch (clearException: Exception) {
+                        Log.e("PlaylistManager", "Error clearing corrupted playlist names: ${clearException.message}")
+                    }
+                    emptyList()
                 } catch (e: Exception) {
                     Log.e("PlaylistManager", "Error parsing playlist names: ${e.message}", e)
                     emptyList()
@@ -231,10 +264,29 @@ class PlaylistManager @Inject constructor(
      * Clear all playlist data
      */
     suspend fun clearAll() {
-        context.playlistDataStore.edit { preferences ->
-            preferences.clear()
+        try {
+            context.playlistDataStore.edit { preferences ->
+                preferences.clear()
+            }
+            Log.d("PlaylistManager", "Cleared all playlist data")
+        } catch (e: Exception) {
+            Log.e("PlaylistManager", "Error clearing all data: ${e.message}", e)
         }
-        Log.d("PlaylistManager", "Cleared all playlist data")
+    }
+
+    /**
+     * Clear only corrupted data
+     */
+    suspend fun clearCorruptedData() {
+        try {
+            context.playlistDataStore.edit { preferences ->
+                preferences.remove(CURRENT_PLAYLIST)
+                preferences.remove(SAVED_PLAYLISTS)
+            }
+            Log.d("PlaylistManager", "Cleared corrupted playlist data")
+        } catch (e: Exception) {
+            Log.e("PlaylistManager", "Error clearing corrupted data: ${e.message}", e)
+        }
     }
 }
 
