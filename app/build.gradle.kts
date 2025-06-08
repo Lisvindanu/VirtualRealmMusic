@@ -1,6 +1,6 @@
 // app/build.gradle.kts
-// Perbaikan cara loading local.properties
 
+// This block is needed to read your local.properties file
 import java.io.FileInputStream
 import java.util.Properties
 
@@ -9,10 +9,6 @@ val localProperties = Properties().apply {
     if (localPropertiesFile.exists()) {
         load(FileInputStream(localPropertiesFile))
     }
-}
-
-fun getProperty(key: String, defaultValue: String): String {
-    return localProperties.getProperty(key, defaultValue)
 }
 
 plugins {
@@ -30,6 +26,13 @@ android {
     ksp {
         arg("ksp.kotlin.1.9.compatibility", "true")
     }
+
+    // Merged buildFeatures block
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
     defaultConfig {
         applicationId = "com.virtualrealm.virtualrealmmusicplayer"
         minSdk = 24
@@ -39,17 +42,17 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        // Spotify API credentials - dari local.properties
-        buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${getProperty("spotify.client.id", "")}\"")
-        buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${getProperty("spotify.client.secret", "")}\"")
-        buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"${getProperty("spotify.redirect.uri", "")}\"")
+        // API credentials from local.properties
+        buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${localProperties.getProperty("spotify.client.id", "")}\"")
+        buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${localProperties.getProperty("spotify.client.secret", "")}\"")
+        buildConfigField("String", "SPOTIFY_REDIRECT_URI", "\"${localProperties.getProperty("spotify.redirect.uri", "")}\"")
+        buildConfigField("String", "YOUTUBE_API_KEY", "\"${localProperties.getProperty("youtube.api.key", "")}\"")
 
-        // YouTube API key - dari local.properties
-        buildConfigField("String", "YOUTUBE_API_KEY", "\"${getProperty("youtube.api.key", "")}\"")
-        manifestPlaceholders.put("redirectSchemeName", "com.virtualrealm.virtualrealmmusicplayer")
-        manifestPlaceholders.put("redirectHostName", "callback")
-        manifestPlaceholders.put("appAuthRedirectScheme", "com.virtualrealm.virtualrealmmusicplayer")
+        manifestPlaceholders["redirectSchemeName"] = "com.virtualrealm.virtualrealmmusicplayer"
+        manifestPlaceholders["redirectHostName"] = "callback"
+        manifestPlaceholders["appAuthRedirectScheme"] = "com.virtualrealm.virtualrealmmusicplayer"
     }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -60,15 +63,6 @@ android {
         }
     }
 
-    buildFeatures {
-        compose = true
-        buildConfig = true
-    }
-
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -76,6 +70,10 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.1"
     }
 }
 
@@ -107,7 +105,7 @@ dependencies {
 
     // Animated Bottom Navigation Bar
     implementation("com.exyte:animated-navigation-bar:1.0.0")
-//    implementation(libs.spotify.player) // Add this
+
     // Accompanist (Compose utilities)
     implementation(libs.accompanist.permissions)
     implementation(libs.accompanist.systemuicontroller)
@@ -115,7 +113,7 @@ dependencies {
 
     // Hilt Dependency Injection
     implementation(libs.hilt.android)
-    ksp(libs.hilt.android.compiler) // Added Hilt compiler dependency
+    ksp(libs.hilt.android.compiler)
 
     // Room for local database
     implementation(libs.androidx.room.runtime)
@@ -144,9 +142,9 @@ dependencies {
     // DataStore Preferences
     implementation(libs.androidx.datastore.preferences)
 
-    // Add to dependencies section in app/build.gradle.kts
+    // Other libraries
     implementation(libs.glide)
-    implementation(libs.androidx.media)  // For MediaStyle notifications
+    implementation(libs.androidx.media)
     implementation(libs.appauth)
     implementation(libs.androidx.browser)
 
@@ -161,7 +159,6 @@ dependencies {
     androidTestImplementation(libs.ui.test.junit4)
     debugImplementation(libs.ui.test.manifest)
 
-    // spotify aar
+    // Spotify AAR
     implementation(files("libs/spotify-app-remote-release-0.8.0.aar"))
-//    implementation(files("libs/spotify-auth-release-2.1.0.aar"))
 }

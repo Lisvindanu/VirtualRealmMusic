@@ -12,5 +12,5 @@ object AppConfig {
     const val SPOTIFY_REDIRECT_URI: String = "com.virtualrealm.virtualrealmmusicplayer://callback"
 
     // YouTube credentials
-    const val YOUTUBE_API_KEY: String = "AIzaSyCvMokdapr1y3mdVbirFdHMAuJpp3BhUXY"
+    val YOUTUBE_API_KEY: String = com.virtualrealm.virtualrealmmusicplayer.BuildConfig.YOUTUBE_API_KEY
 }
