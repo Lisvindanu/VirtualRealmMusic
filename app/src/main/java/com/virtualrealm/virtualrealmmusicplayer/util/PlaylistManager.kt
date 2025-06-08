@@ -25,10 +25,10 @@ import java.io.IOException
  */
 @Singleton
 class PlaylistManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val gson: Gson // Inject Gson dari Hilt
 ) {
     private val Context.playlistDataStore: DataStore<Preferences> by preferencesDataStore("playlist_preferences")
-    private val gson = Gson()
 
     // Keys for DataStore
     companion object {
@@ -95,12 +95,19 @@ class PlaylistManager @Inject constructor(
 
                 try {
                     // Parse the playlist from JSON
-                    val type = object : TypeToken<List<Music>>() {}.type
-                    val playlist: List<Music> = gson.fromJson(playlistJson, type)
+                    val type = object : TypeToken<ArrayList<Music>>() {}.type
+                    val playlist: List<Music> = gson.fromJson(playlistJson, type) ?: emptyList()
+
+                    // Perbaikan: Pastikan index tidak melewati batas
+                    val safeIndex = if (playlist.isNotEmpty()) {
+                        lastIndex.coerceIn(0, playlist.lastIndex)
+                    } else {
+                        0
+                    }
 
                     PlaylistState(
                         playlist = playlist,
-                        currentIndex = lastIndex.coerceIn(0, playlist.size - 1),
+                        currentIndex = safeIndex,
                         positionMs = lastPosition,
                         lastPlayedId = lastPlayedId
                     )
@@ -145,7 +152,7 @@ class PlaylistManager @Inject constructor(
                 return mutableMapOf()
             }
 
-            val type = object : TypeToken<Map<String, List<Music>>>() {}.type
+            val type = object : TypeToken<MutableMap<String, ArrayList<Music>>>() {}.type
             gson.fromJson(playlistsJson, type) ?: mutableMapOf()
         } catch (e: Exception) {
             Log.e("PlaylistManager", "Error getting saved playlists: ${e.message}", e)
@@ -176,7 +183,7 @@ class PlaylistManager @Inject constructor(
                 try {
                     val type = object : TypeToken<Map<String, List<Music>>>() {}.type
                     val playlists: Map<String, List<Music>> = gson.fromJson(playlistsJson, type)
-                    playlists.keys.toList()
+                    playlists.keys.toList().sorted()
                 } catch (e: Exception) {
                     Log.e("PlaylistManager", "Error parsing playlist names: ${e.message}", e)
                     emptyList()

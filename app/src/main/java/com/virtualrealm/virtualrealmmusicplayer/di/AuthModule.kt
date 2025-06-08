@@ -4,7 +4,10 @@ package com.virtualrealm.virtualrealmmusicplayer.di
 
 import android.content.Context
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import com.virtualrealm.virtualrealmmusicplayer.data.auth.SpotifyAuthHandler
+import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
+import com.virtualrealm.virtualrealmmusicplayer.util.RuntimeTypeAdapterFactory
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -22,7 +25,15 @@ object AuthModule {
     @Provides
     @Singleton
     fun provideGson(): Gson {
-        return Gson()
+        // Daftarkan adapter untuk sealed class Music
+        val musicAdapterFactory = RuntimeTypeAdapterFactory
+            .of(Music::class.java, "music_type") // Gunakan nama field yang unik
+            .registerSubtype(Music.SpotifyTrack::class.java, "spotify")
+            .registerSubtype(Music.YoutubeVideo::class.java, "youtube")
+
+        return GsonBuilder()
+            .registerTypeAdapterFactory(musicAdapterFactory)
+            .create()
     }
 
     @Provides

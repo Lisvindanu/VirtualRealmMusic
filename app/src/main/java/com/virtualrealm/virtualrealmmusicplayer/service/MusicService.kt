@@ -5,7 +5,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ContentValues.TAG
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -22,6 +21,7 @@ import android.os.PowerManager
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -29,47 +29,46 @@ import com.virtualrealm.virtualrealmmusicplayer.MainActivity
 import com.virtualrealm.virtualrealmmusicplayer.R
 import com.virtualrealm.virtualrealmmusicplayer.domain.model.Music
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.net.URL
 import javax.inject.Inject
-import android.util.Log
-import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener,
     AudioManager.OnAudioFocusChangeListener {
 
+    // --- Injeksi Dependensi ---
     @Inject
     lateinit var musicExtractionService: MusicExtractionService
-
     @Inject
     lateinit var youTubeAudioPlayer: YouTubeAudioPlayer
-
     @Inject
     lateinit var spotifyPlayerManager: SpotifyPlayerManager
-
     @Inject
     lateinit var spotifyWebPlayerHelper: SpotifyWebPlayerHelper
 
+    // --- Properti Inti ---
     private val binder = MusicBinder()
     private var mediaPlayer: MediaPlayer? = null
-    private var currentMusic: Music? = null
-    private var currentAudioUrl: String? = null
     private var mediaSession: MediaSessionCompat? = null
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
-    private var currentAlbumArt: Bitmap? = null
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    // --- State Management ---
+    private var currentMusic: Music? = null
+    private var currentAudioUrl: String? = null
+    private var currentAlbumArt: Bitmap? = null
+    private var isMediaPlayerPrepared = false
 
     private val _playbackState = MutableStateFlow(PlaybackState.IDLE)
     val playbackState: StateFlow<PlaybackState> = _playbackState
@@ -77,22 +76,20 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
     private val _currentTrack = MutableStateFlow<Music?>(null)
     val currentTrack: StateFlow<Music?> = _currentTrack
 
-    // Playlist functionality
     private val _playlist = MutableStateFlow<List<Music>>(emptyList())
     val playlist: StateFlow<List<Music>> = _playlist
 
-    private val _currentIndex = MutableStateFlow(0)
+    private val _currentIndex = MutableStateFlow(-1)
     val currentIndex: StateFlow<Int> = _currentIndex
 
     companion object {
+        private const val TAG = "MusicService"
         private const val NOTIFICATION_ID = 1
         private const val CHANNEL_ID = "music_playback_channel"
         private const val MEDIA_SESSION_TAG = "VirtualRealmMusicPlayer"
     }
 
-    enum class PlaybackState {
-        IDLE, PREPARING, PLAYING, PAUSED, STOPPED, ERROR
-    }
+    enum class PlaybackState { IDLE, PREPARING, PLAYING, PAUSED, STOPPED, ERROR }
 
     inner class MusicBinder : Binder() {
         fun getService(): MusicService = this@MusicService
@@ -856,8 +853,9 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
 
     override fun onPrepared(mp: MediaPlayer?) {
         try {
-            Log.d("MusicService", "Media player prepared successfully!")
-            mediaPlayer?.start()
+            Log.d(TAG, "Media player prepared successfully!")
+            isMediaPlayerPrepared = true
+            mp?.start() // Panggil start() di sini
             _playbackState.value = PlaybackState.PLAYING
             updatePlaybackState(PlaybackState.PLAYING)
 
@@ -871,9 +869,8 @@ class MusicService : LifecycleService(), MediaPlayer.OnPreparedListener,
                 startForeground(NOTIFICATION_ID, createNotification())
             }
         } catch (e: Exception) {
-            Log.e("MusicService", "Error starting playback: ${e.message}", e)
+            Log.e(TAG, "Error starting playback: ${e.message}", e)
             _playbackState.value = PlaybackState.ERROR
-            logPlaybackState(PlaybackState.ERROR, "Error starting playback: ${e.message}")
         }
     }
 
